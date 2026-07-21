@@ -53,6 +53,11 @@ a {
   text-shadow: 0 0 28px rgba(122, 162, 247, 0.45);
 }
 
+.site-header h1 .dim {
+  color: var(--muted);
+  text-shadow: none;
+}
+
 .tagline {
   color: var(--muted);
   margin-top: 0.25rem;
