@@ -60,15 +60,23 @@ a {
 }
 
 .site-header nav {
-  margin-top: 1rem;
+  margin-top: 1.25rem;
   display: flex;
-  gap: 1.5rem;
+  gap: 1rem;
   font-size: 13px;
 }
 
+.site-header nav a {
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.25em 0.9em;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
 .site-header nav a:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  color: var(--heading);
+  border-color: var(--blue);
 }
 
 .project {
