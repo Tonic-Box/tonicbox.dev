@@ -132,10 +132,6 @@ body {
   .fetch { flex-direction: column; align-items: flex-start; gap: 1rem; }
 }
 
-.value {
-  color: var(--blue);
-}
-
 .purple {
   color: var(--purple);
 }
