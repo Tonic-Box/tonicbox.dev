@@ -1,16 +1,11 @@
 :root {
   --bg: #0b0e14;
-  --panel: #10141f;
-  --panel-hover: #141a2b;
-  --panel-border: #1c2333;
+  --border: #1c2333;
   --heading: #e6ebff;
   --text: #a9b1d6;
   --muted: #565f89;
   --green: #9ece6a;
   --blue: #7aa2f7;
-  --purple: #bb9af7;
-  --yellow: #e0af68;
-  --red: #f7768e;
   --mono: "Cascadia Code", "JetBrains Mono", "Fira Code", Consolas, "SF Mono", monospace;
   --sans: "Segoe UI", system-ui, -apple-system, sans-serif;
 }
@@ -23,12 +18,11 @@
 
 body {
   background: var(--bg);
-  background-image: radial-gradient(ellipse at 50% -20%, #131a2a 0%, var(--bg) 60%);
   color: var(--text);
   font-family: var(--mono);
   font-size: 15px;
   line-height: 1.65;
-  max-width: 960px;
+  max-width: 720px;
   margin: 0 auto;
   padding: 3rem 1.5rem 2rem;
 }
@@ -43,7 +37,7 @@ a {
 }
 
 .site-header {
-  margin-bottom: 3.5rem;
+  margin-bottom: 3rem;
 }
 
 .prompt-line {
@@ -53,147 +47,53 @@ a {
 }
 
 .site-header h1 {
-  font-size: 2.6rem;
+  font-size: 2.2rem;
   letter-spacing: 0.08em;
   color: var(--heading);
   text-shadow: 0 0 28px rgba(122, 162, 247, 0.45);
 }
 
 .tagline {
-  color: var(--blue);
-  margin-top: 0.35rem;
+  color: var(--muted);
+  margin-top: 0.25rem;
   font-size: 14px;
 }
 
 .site-header nav {
-  margin-top: 1.25rem;
+  margin-top: 1rem;
   display: flex;
   gap: 1.5rem;
   font-size: 13px;
 }
 
-.site-header nav a {
-  color: var(--muted);
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
-  padding: 0.25em 0.9em;
-  transition: color 0.15s ease, border-color 0.15s ease;
-}
-
 .site-header nav a:hover {
-  color: var(--heading);
-  border-color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
-section {
-  margin-bottom: 3.5rem;
+.project {
+  margin-bottom: 1.5rem;
 }
 
-.accent-blue   { --accent: var(--blue);   --accent-dim: rgba(122, 162, 247, 0.35); }
-.accent-purple { --accent: var(--purple); --accent-dim: rgba(187, 154, 247, 0.35); }
-.accent-green  { --accent: var(--green);  --accent-dim: rgba(158, 206, 106, 0.35); }
-.accent-yellow { --accent: var(--yellow); --accent-dim: rgba(224, 175, 104, 0.35); }
-.accent-red    { --accent: var(--red);    --accent-dim: rgba(247, 118, 142, 0.35); }
-
-.section-head {
-  display: flex;
-  align-items: baseline;
-  gap: 0.6rem;
+.project-name {
   font-size: 1.05rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--heading);
-  margin-bottom: 1.25rem;
 }
 
-.section-head .prompt {
-  color: var(--accent);
+.project-name:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
-.section-head::after {
-  content: "";
-  flex-grow: 1;
-  height: 1px;
-  background: linear-gradient(to right, var(--accent-dim), transparent);
-  align-self: center;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 1.1rem;
-}
-
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-left: 3px solid var(--accent);
-  border-radius: 8px;
-  padding: 1.25rem 1.4rem;
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.card:hover {
-  background: var(--panel-hover);
-  border-color: var(--accent);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 0 1px var(--accent-dim);
-}
-
-.card.featured,
-.card.wide {
-  grid-column: 1 / -1;
-}
-
-.card-top {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.card h3 {
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: var(--heading);
-}
-
-.card.featured h3 {
-  font-size: 1.55rem;
-}
-
-.card:hover h3 {
-  color: var(--accent);
-}
-
-.card p {
+.project p {
   font-family: var(--sans);
   font-size: 14.5px;
-  line-height: 1.6;
-  color: var(--text);
-  flex-grow: 1;
-}
-
-.badge {
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--yellow);
-  border: 1px solid var(--yellow);
-  border-radius: 999px;
-  padding: 0 0.6em;
-  line-height: 1.6;
-}
-
-.badge.alt {
-  color: var(--green);
-  border-color: var(--green);
+  margin-top: 0.15rem;
 }
 
 footer {
-  margin-top: 4rem;
-  border-top: 1px solid var(--panel-border);
+  margin-top: 3.5rem;
+  border-top: 1px solid var(--border);
   padding-top: 1.25rem;
   font-size: 13px;
   color: var(--muted);
@@ -206,6 +106,5 @@ footer .copyright {
 
 @media (max-width: 540px) {
   body { padding: 2rem 1rem; }
-  .site-header h1 { font-size: 1.9rem; }
-  .grid { grid-template-columns: 1fr; }
+  .site-header h1 { font-size: 1.7rem; }
 }
