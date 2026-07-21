@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TonicBox</title>
+  <meta name="description" content="TonicBox — reverse engineering, security research, and low-level things. Coming soon.">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230b0e14'/><text x='2' y='12' font-family='monospace' font-size='11' fill='%237aa2f7'>&gt;_</text></svg>">
+</head>
+<body>
+  <main class="terminal">
+    <div class="titlebar">
+      <span class="dot red"></span>
+      <span class="dot yellow"></span>
+      <span class="dot green"></span>
+      <span class="title">tonicbox@dev: ~</span>
+    </div>
+
+    <div class="screen">
+      <p class="line"><span class="prompt">tonicbox@dev:~$</span> whoami</p>
+      <p class="line output name">TonicBox</p>
+
+      <p class="line"><span class="prompt">tonicbox@dev:~$</span> file ./site</p>
+      <p class="line output">./site: ELF 64-bit LSB executable, not stripped, <span class="hl">under construction</span></p>
+
+      <p class="line"><span class="prompt">tonicbox@dev:~$</span> objdump -d ./site | head</p>
+      <pre class="line output asm">0000000000001040 &lt;main&gt;:
+  1040:  55                     push   rbp
+  1041:  48 89 e5               mov    rbp,rsp
+  1044:  bf 01 00 00 00         mov    edi,0x1
+  1049:  e8 f2 ff ff ff         call   1000 &lt;coming_soon&gt;
+  104e:  31 c0                  xor    eax,eax
+  1050:  5d                     pop    rbp
+  1051:  c3                     ret</pre>
+
+      <p class="line"><span class="prompt">tonicbox@dev:~$</span> ./site</p>
+      <p class="line output status">[*] coming soon — development, reversing, research &amp; writeups</p>
+
+      <p class="line"><span class="prompt">tonicbox@dev:~$</span> <span class="cursor"></span></p>
+    </div>
+  </main>
+
+  <footer>
+    <span>&copy; 2026 TonicBox</span>
+  </footer>
+</body>
+</html>

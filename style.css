@@ -1,0 +1,144 @@
+:root {
+  --bg: #0b0e14;
+  --panel: #10141f;
+  --panel-border: #1c2333;
+  --text: #c0caf5;
+  --muted: #565f89;
+  --green: #9ece6a;
+  --blue: #7aa2f7;
+  --red: #f7768e;
+  --yellow: #e0af68;
+  --font: "Cascadia Code", "JetBrains Mono", "Fira Code", Consolas, "SF Mono", monospace;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  background-image: radial-gradient(ellipse at 50% -20%, #131a2a 0%, var(--bg) 60%);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.7;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 1rem;
+}
+
+.terminal {
+  width: 100%;
+  max-width: 720px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #0d111a;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.dot.red { background: var(--red); }
+.dot.yellow { background: var(--yellow); }
+.dot.green { background: var(--green); }
+
+.titlebar .title {
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.screen {
+  padding: 1.5rem 1.75rem 2rem;
+  overflow-x: auto;
+}
+
+.line {
+  margin-top: 0.35rem;
+  white-space: nowrap;
+}
+
+.prompt {
+  color: var(--green);
+}
+
+.output {
+  color: var(--muted);
+}
+
+.output.name {
+  color: var(--blue);
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin: 0.2rem 0 0.8rem;
+  text-shadow: 0 0 24px rgba(122, 162, 247, 0.35);
+}
+
+.output.status {
+  color: var(--text);
+  margin-bottom: 0.8rem;
+}
+
+.hl {
+  color: var(--yellow);
+}
+
+.asm {
+  font-family: var(--font);
+  font-size: 12.5px;
+  color: var(--muted);
+  background: #0d111a;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  margin: 0.5rem 0 0.8rem;
+  overflow-x: auto;
+}
+
+.cursor {
+  display: inline-block;
+  width: 0.6em;
+  height: 1.1em;
+  background: var(--text);
+  vertical-align: text-bottom;
+  animation: blink 1.1s steps(1) infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+footer {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 540px) {
+  body { font-size: 13px; }
+  .output.name { font-size: 1.4rem; }
+  .screen { padding: 1rem 1rem 1.4rem; }
+}
