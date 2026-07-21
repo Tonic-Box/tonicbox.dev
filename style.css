@@ -38,7 +38,7 @@ body {
 
 .terminal {
   width: 100%;
-  max-width: 720px;
+  max-width: 755px;
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 8px;
@@ -94,8 +94,57 @@ body {
   font-size: 2rem;
   font-weight: 700;
   letter-spacing: 0.08em;
-  margin: 0.2rem 0 0.8rem;
+  margin: 0.2rem 0 0.4rem;
   text-shadow: 0 0 24px rgba(122, 162, 247, 0.35);
+}
+
+.fetch {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  margin: 0.15rem 0 0.9rem;
+}
+
+.ascii {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  color: var(--blue);
+  font-size: 21px;
+  line-height: 1.35;
+  flex-shrink: 0;
+  padding: 0 0.75rem 0 0.5rem;
+}
+
+.fetch-line {
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.fetch-key {
+  display: inline-block;
+  width: 5em;
+  color: var(--green);
+  font-weight: 600;
+}
+
+.palette {
+  display: flex;
+  gap: 5px;
+  margin-top: 0.7rem;
+}
+
+.palette span {
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+}
+
+@media (max-width: 540px) {
+  .fetch { flex-direction: column; align-items: flex-start; gap: 1rem; }
+}
+
+.value {
+  color: var(--blue);
 }
 
 .output.status {
