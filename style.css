@@ -127,18 +127,6 @@ body {
   font-weight: 600;
 }
 
-.palette {
-  display: flex;
-  gap: 5px;
-  margin-top: 0.7rem;
-}
-
-.palette span {
-  width: 15px;
-  height: 15px;
-  border-radius: 3px;
-}
-
 @media (max-width: 540px) {
   .fetch { flex-direction: column; align-items: flex-start; gap: 1rem; }
 }

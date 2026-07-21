@@ -191,28 +191,6 @@ section {
   border-color: var(--green);
 }
 
-.tags {
-  list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.15rem;
-}
-
-.tags li {
-  font-size: 11px;
-  color: var(--muted);
-  background: #0d111a;
-  border: 1px solid var(--panel-border);
-  border-radius: 4px;
-  padding: 0.1em 0.6em;
-}
-
-.tags li.yabr {
-  color: var(--blue);
-  border-color: #2a3554;
-}
-
 footer {
   margin-top: 4rem;
   border-top: 1px solid var(--panel-border);
