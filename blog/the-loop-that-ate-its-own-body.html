@@ -20,7 +20,7 @@
     </header>
 
     <div class="post-body">
-      <p>I work on <a href="https://github.com/Tonic-Box/YABR" target="_blank" rel="noopener">YABR</a>, a bidirectional Java (de)compiler and transformation framework built around a stack of representations &mdash; bytecode, SSA, a structured IR, source &mdash; that a program can move freely across. Two of those layers matter here. The SSA IR is close to the bytecode: a control-flow graph of basic blocks, every value assigned once. The structured IR is close to source: a tree of expressions and statements. The bug lived in the pass between them, the one that lifts SSA into the structured IR &mdash; reconstructing <code>if</code>/<code>else</code>, <code>while</code>, <code>for</code>, the vocabulary a human would have written before javac flattened it into jumps.</p>
+      <p>I work on <a href="https://github.com/Tonic-Box/YABR" target="_blank" rel="noopener">YABR</a>, a bidirectional Java (de)compiler and transformation framework built around a stack of representations - bytecode, SSA, a structured IR, source - that a program can move freely across. Two of those layers matter here. The SSA IR is close to the bytecode: a control-flow graph of basic blocks, every value assigned once. The structured IR is close to source: a tree of expressions and statements. The bug lived in the pass between them, the one that lifts SSA into the structured IR - reconstructing <code>if</code>/<code>else</code>, <code>while</code>, <code>for</code>, the vocabulary a human would have written before javac flattened it into jumps.</p>
 
       <p>Lately I've been building a transpiler on top of it: feed it a .jar, get a program in another language back out. There's a proper test suite behind all this, but to stress test it and help with hammering down JNI in transpilation, I wrote a simple game using jMonkey in Java. If any of it breaks, some method came out of the reconstructor subtly wrong, and I get to go find it.</p>
 
@@ -34,7 +34,7 @@
 
       <ul>
         <li>Was the font atlas loading? I dumped the texture. It was there, glyphs and all.</li>
-        <li>Was the material getting a null texture? No &mdash; the same font renders fine if I hand it a string manually.</li>
+        <li>Was the material getting a null texture? No - the same font renders fine if I hand it a string manually.</li>
         <li>Was the overlay z-ordered behind something, or scaled to zero, or off-screen? I moved it, recolored it, made it enormous. Still nothing.</li>
       </ul>
 
@@ -42,7 +42,7 @@
 
       <h2>Zero of something</h2>
 
-      <p>The break came when I stopped looking at why the text wasn't <em>visible</em> and started looking at what the text actually <em>was</em>. jME builds on-screen text as geometry &mdash; each glyph is two triangles, positioned from the font's layout tables. So I reached into the <code>BitmapText</code> after it was supposed to have laid itself out and asked it how many vertices it had.</p>
+      <p>The break came when I stopped looking at why the text wasn't <em>visible</em> and started looking at what the text actually <em>was</em>. jME builds on-screen text as geometry - each glyph is two triangles, positioned from the font's layout tables. So I reached into the <code>BitmapText</code> after it was supposed to have laid itself out and asked it how many vertices it had.</p>
 
       <p><strong>Zero.</strong></p>
 
@@ -92,7 +92,7 @@
 
       <ul>
         <li>The <code>while</code> became a <code>do</code>/<code>while</code>.</li>
-        <li>The mesh-building code &mdash; the part that was supposed to run <em>after</em> the loop &mdash; got pulled inside it, onto the very first exit path.</li>
+        <li>The mesh-building code - the part that was supposed to run <em>after</em> the loop - got pulled inside it, onto the very first exit path.</li>
         <li>The real body of the loop, the <code>pageQuads.add(...)</code>, got shoved out past the end of the loop, where it's dead code that never runs.</li>
       </ul>
 
@@ -110,14 +110,14 @@
 
       <ul>
         <li>Build the dominator tree.</li>
-        <li>Find back-edges &mdash; an edge <code>A -&gt; B</code> where B dominates A. Every back-edge is a loop closing on itself.</li>
+        <li>Find back-edges - an edge <code>A -&gt; B</code> where B dominates A. Every back-edge is a loop closing on itself.</li>
         <li>For each back-edge, compute the natural loop: the header B, the tail A, and every block that can reach A without going through B.</li>
-        <li>Classify the loop &mdash; top-tested (<code>while</code>), bottom-tested (<code>do</code>/<code>while</code>), counted (<code>for</code>) &mdash; from where the condition lives.</li>
+        <li>Classify the loop - top-tested (<code>while</code>), bottom-tested (<code>do</code>/<code>while</code>), counted (<code>for</code>) - from where the condition lives.</li>
       </ul>
 
       <p>Step 4 is where mine went wrong, but the root cause was hiding in step 3.</p>
 
-      <p>The distinguishing move for a do-while is finding what I call a <em>conditional latch</em>: a block inside the loop whose branch is the loop's bottom test &mdash; one arm jumps back to the header, the other arm leaves the loop. If a loop has exactly one such block, it's bottom-tested. The check is small and, I thought, obviously correct:</p>
+      <p>The distinguishing move for a do-while is finding what I call a <em>conditional latch</em>: a block inside the loop whose branch is the loop's bottom test - one arm jumps back to the header, the other arm leaves the loop. If a loop has exactly one such block, it's bottom-tested. The check is small and, I thought, obviously correct:</p>
 
       <pre><code><span class="k">private</span> <span class="t">IRBlock</span> <span class="fn">findConditionalLatch</span>(<span class="t">IRBlock</span> header, <span class="t">Loop</span> loop) {
     <span class="t">IRBlock</span> latch = <span class="k">null</span>;
@@ -157,7 +157,7 @@
     }
 }</code></pre>
 
-      <p>One <code>Loop</code> object per back-edge. A loop with two <code>continue</code> paths produced <em>two</em> Loops, both with the same header, each containing a different subset of the body &mdash; because the natural loop of back-edge #1 doesn't necessarily include the blocks that only back-edge #2 reaches.</p>
+      <p>One <code>Loop</code> object per back-edge. A loop with two <code>continue</code> paths produced <em>two</em> Loops, both with the same header, each containing a different subset of the body - because the natural loop of back-edge #1 doesn't necessarily include the blocks that only back-edge #2 reaches.</p>
 
       <p>Downstream, when the classifier wanted "the loop for this header," it grabbed the first one it found:</p>
 

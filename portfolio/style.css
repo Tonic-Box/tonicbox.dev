@@ -85,6 +85,18 @@ a {
   text-underline-offset: 3px;
 }
 
+.doc-link {
+  margin-left: 0.7rem;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.doc-link:hover {
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .project p {
   font-family: var(--sans);
   font-size: 14.5px;
