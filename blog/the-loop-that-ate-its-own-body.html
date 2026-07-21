@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The loop that ate its own body — TonicBox</title>
+  <meta name="description" content="A decompiler war story: how two continue statements convinced YABR's loop reconstructor to turn a while loop inside out, and the missing FPS counter that exposed it.">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230b0e14'/><text x='2' y='12' font-family='monospace' font-size='11' fill='%237aa2f7'>&gt;_</text></svg>">
+</head>
+<body>
+  <article>
+    <header class="post-head">
+      <nav class="links">
+        <a href="./">&larr; ~/blog</a>
+        <a href="https://tonicbox.dev">~ home</a>
+      </nav>
+      <h1>The loop that ate its own body</h1>
+      <p class="meta">2026-07-15 &middot; TonicBox &middot; <a href="https://github.com/Tonic-Box/YABR" target="_blank" rel="noopener">YABR</a></p>
+    </header>
+
+    <div class="post-body">
+      <p>I work on <a href="https://github.com/Tonic-Box/YABR" target="_blank" rel="noopener">YABR</a>, a bidirectional Java (de)compiler and transformation framework built around a stack of representations &mdash; bytecode, SSA, a structured IR, source &mdash; that a program can move freely across. Two of those layers matter here. The SSA IR is close to the bytecode: a control-flow graph of basic blocks, every value assigned once. The structured IR is close to source: a tree of expressions and statements. The bug lived in the pass between them, the one that lifts SSA into the structured IR &mdash; reconstructing <code>if</code>/<code>else</code>, <code>while</code>, <code>for</code>, the vocabulary a human would have written before javac flattened it into jumps.</p>
+
+      <p>Lately I've been building a transpiler on top of it: feed it a .jar, get a program in another language back out. There's a proper test suite behind all this, but to stress test it and help with hammering down JNI in transpilation, I wrote a simple game using jMonkey in Java. If any of it breaks, some method came out of the reconstructor subtly wrong, and I get to go find it.</p>
+
+      <h2>Nothing, specifically</h2>
+
+      <p>The game booted. The scene drew. I could walk around with WASD, the mouse looked where I pointed it, boxes fell and stacked and behaved like boxes. By every measure that throws an exception, the port was fine.</p>
+
+      <p>Except the debug overlay was gone. No FPS counter, no triangle count, none of the little white text jMonkeyEngine paints in the corner when you enable stats. Just... nothing there.</p>
+
+      <p>Missing text is a miserable thing to debug, because there are a hundred boring reasons for it and one interesting one. The boring ones came first:</p>
+
+      <ul>
+        <li>Was the font atlas loading? I dumped the texture. It was there, glyphs and all.</li>
+        <li>Was the material getting a null texture? No &mdash; the same font renders fine if I hand it a string manually.</li>
+        <li>Was the overlay z-ordered behind something, or scaled to zero, or off-screen? I moved it, recolored it, made it enormous. Still nothing.</li>
+      </ul>
+
+      <p>I spent that evening convinced it was the font. It wasn't.</p>
+
+      <h2>Zero of something</h2>
+
+      <p>The break came when I stopped looking at why the text wasn't <em>visible</em> and started looking at what the text actually <em>was</em>. jME builds on-screen text as geometry &mdash; each glyph is two triangles, positioned from the font's layout tables. So I reached into the <code>BitmapText</code> after it was supposed to have laid itself out and asked it how many vertices it had.</p>
+
+      <p><strong>Zero.</strong></p>
+
+      <p>Not garbage, not off-screen. Zero. The overlay was rendering perfectly; it just had nothing to render. So this was never a graphics bug, it was a data bug. Something upstream built an empty mesh.</p>
+
+      <p>The glyph geometry gets assembled in a jME internal called <code>BitmapTextPage.assemble()</code>. The original, roughly:</p>
+
+      <pre><code><span class="k">void</span> <span class="fn">assemble</span>(<span class="t">Letters</span> quads) {
+    <span class="c">// ... reset state, size the buffers ...</span>
+    quads.<span class="fn">rewind</span>();
+
+    <span class="k">while</span> (quads.<span class="fn">nextCharacter</span>()) {
+        <span class="k">if</span> (quads.<span class="fn">isPrintable</span>() &amp;&amp; quads.<span class="fn">getCurrentPageIndex</span>() == page) {
+            pageQuads.<span class="fn">add</span>(quads.<span class="fn">getQuad</span>());
+        }
+    }
+
+    <span class="c">// build the vertex/index buffers from pageQuads</span>
+    <span class="c">// ... write positions, tex coords, indices ...</span>
+}</code></pre>
+
+      <p><code>pageQuads</code> comes out empty only if nothing was printable, which, for the string <code>"60 fps"</code>, is absurd.</p>
+
+      <p>So I pulled the version the reconstructor had produced for that same method. And there it was.</p>
+
+      <h2>The reconstruction</h2>
+
+      <p>Here's what came out the other end, cleaned up for readability:</p>
+
+      <pre><code><span class="k">void</span> <span class="fn">assemble</span>(<span class="t">Letters</span> quads) {
+    <span class="c">// ... reset state, size the buffers ...</span>
+    quads.<span class="fn">rewind</span>();
+
+    <span class="k">do</span> {
+        <span class="k">if</span> (quads.<span class="fn">nextCharacter</span>()) {
+            <span class="k">continue</span>;
+        }
+        <span class="c">// build the vertex/index buffers from pageQuads</span>
+        <span class="c">// ... write positions, tex coords, indices ...</span>
+        <span class="k">return</span>;
+    } <span class="k">while</span> (!quads.<span class="fn">isPrintable</span>());
+
+    pageQuads.<span class="fn">add</span>(quads.<span class="fn">getQuad</span>());
+}</code></pre>
+
+      <p>It's a genuinely impressive piece of wrongness. It compiles. It runs. The control flow is valid. It's just been turned inside out:</p>
+
+      <ul>
+        <li>The <code>while</code> became a <code>do</code>/<code>while</code>.</li>
+        <li>The mesh-building code &mdash; the part that was supposed to run <em>after</em> the loop &mdash; got pulled inside it, onto the very first exit path.</li>
+        <li>The real body of the loop, the <code>pageQuads.add(...)</code>, got shoved out past the end of the loop, where it's dead code that never runs.</li>
+      </ul>
+
+      <p>Trace it: first iteration, <code>nextCharacter()</code> returns true, <code>continue</code>. Second call returns false eventually, we fall into the mesh-building block, and <code>return</code>. We build the mesh from a <code>pageQuads</code> that nobody ever added to. Empty mesh. Zero vertices. No FPS counter.</p>
+
+      <p>The bug wasn't in rendering, or fonts, or buffers. The reconstructor had looked at a <code>while</code> loop and confidently rebuilt it as a <code>do</code>/<code>while</code>, and in doing so swapped the loop's body with its continuation. Everything downstream was working exactly as designed on top of a lie.</p>
+
+      <p>Now I had to find out why.</p>
+
+      <h2>How a loop gets its shape back</h2>
+
+      <p>Bytecode doesn't have loops. It has conditional jumps. <code>while (cond) body</code> and <code>do body while (cond)</code> can compile to almost the same instructions; the difference is where the test sits relative to the back-edge. Reconstructing the shape means looking at the CFG and deciding which structured form the jumps came from.</p>
+
+      <p>The pipeline for that is textbook:</p>
+
+      <ul>
+        <li>Build the dominator tree.</li>
+        <li>Find back-edges &mdash; an edge <code>A -&gt; B</code> where B dominates A. Every back-edge is a loop closing on itself.</li>
+        <li>For each back-edge, compute the natural loop: the header B, the tail A, and every block that can reach A without going through B.</li>
+        <li>Classify the loop &mdash; top-tested (<code>while</code>), bottom-tested (<code>do</code>/<code>while</code>), counted (<code>for</code>) &mdash; from where the condition lives.</li>
+      </ul>
+
+      <p>Step 4 is where mine went wrong, but the root cause was hiding in step 3.</p>
+
+      <p>The distinguishing move for a do-while is finding what I call a <em>conditional latch</em>: a block inside the loop whose branch is the loop's bottom test &mdash; one arm jumps back to the header, the other arm leaves the loop. If a loop has exactly one such block, it's bottom-tested. The check is small and, I thought, obviously correct:</p>
+
+      <pre><code><span class="k">private</span> <span class="t">IRBlock</span> <span class="fn">findConditionalLatch</span>(<span class="t">IRBlock</span> header, <span class="t">Loop</span> loop) {
+    <span class="t">IRBlock</span> latch = <span class="k">null</span>;
+    <span class="k">for</span> (<span class="t">IRBlock</span> pred : header.<span class="fn">getPredecessors</span>()) {
+        <span class="k">if</span> (!loop.<span class="fn">contains</span>(pred)) {
+            <span class="k">continue</span>;               <span class="c">// predecessor isn't part of this loop</span>
+        }
+        <span class="k">if</span> (latch != <span class="k">null</span>) {
+            <span class="k">return</span> <span class="k">null</span>;            <span class="c">// more than one in-loop predecessor -&gt; not a clean bottom test</span>
+        }
+        latch = pred;
+    }
+    <span class="c">// ... latch must end in a branch, one arm to header, one arm out of the loop ...</span>
+}</code></pre>
+
+      <p>Everything hangs on that <code>if (latch != null) return null;</code>. Two or more in-loop predecessors feeding the header means this can't be one clean bottom test, so bail out and treat it as a plain top-tested loop. Hold onto that guard.</p>
+
+      <h2>Two back-edges walk into a header</h2>
+
+      <p><code>assemble</code>'s loop body has this shape:</p>
+
+      <pre><code><span class="k">while</span> (quads.<span class="fn">nextCharacter</span>()) {
+    <span class="k">if</span> (quads.<span class="fn">isPrintable</span>() &amp;&amp; quads.<span class="fn">getCurrentPageIndex</span>() == page) {
+        pageQuads.<span class="fn">add</span>(quads.<span class="fn">getQuad</span>());
+    }
+}</code></pre>
+
+      <p>That body has two skip paths: one for a non-printable character, one for a character on the wrong page. When either fires, control jumps back to the header to test the next character. Two back-edges to the same header.</p>
+
+      <p>And here's the thing I'd gotten wrong two steps earlier, in the natural-loop code:</p>
+
+      <pre><code><span class="c">// old identifyLoops(): one Loop per back-edge</span>
+<span class="k">for</span> (<span class="t">Map.Entry</span>&lt;<span class="t">IRBlock</span>, <span class="t">Set</span>&lt;<span class="t">IRBlock</span>&gt;&gt; entry : backEdges.<span class="fn">entrySet</span>()) {
+    <span class="t">IRBlock</span> tail = entry.<span class="fn">getKey</span>();
+    <span class="k">for</span> (<span class="t">IRBlock</span> header : entry.<span class="fn">getValue</span>()) {
+        loops.<span class="fn">add</span>(<span class="k">new</span> <span class="t">Loop</span>(header, <span class="fn">findNaturalLoop</span>(header, tail)));
+    }
+}</code></pre>
+
+      <p>One <code>Loop</code> object per back-edge. A loop with two <code>continue</code> paths produced <em>two</em> Loops, both with the same header, each containing a different subset of the body &mdash; because the natural loop of back-edge #1 doesn't necessarily include the blocks that only back-edge #2 reaches.</p>
+
+      <p>Downstream, when the classifier wanted "the loop for this header," it grabbed the first one it found:</p>
+
+      <pre><code><span class="k">private</span> <span class="t">Loop</span> <span class="fn">findLoopWithHeader</span>(<span class="t">IRBlock</span> block) {
+    <span class="k">for</span> (<span class="t">Loop</span> loop : loopAnalysis.<span class="fn">getLoops</span>()) {
+        <span class="k">if</span> (loop.<span class="fn">getHeader</span>() == block) {
+            <span class="k">return</span> loop;      <span class="c">// whichever one happens to be first</span>
+        }
+    }
+    <span class="k">return</span> <span class="k">null</span>;
+}</code></pre>
+
+      <p>So <code>findConditionalLatch</code> ran against a loop missing half its own body. The header really had two in-loop predecessors, but one of them lived in the blocks this undersized <code>Loop</code> didn't know about. The latch check saw exactly one, <code>latch != null</code> never tripped, and the guard that should have said "too many back-edges, not a bottom test" stayed silent.</p>
+
+      <p>One surviving predecessor, ending in a branch, one arm looping, one arm leaving. Textbook conditional latch. The classifier declared <code>do</code>/<code>while</code> with total confidence, handed the reconstructor a header and a latch that described a loop half the real size, and the reconstructor faithfully did what it was told: put the code after the "latch" outside the loop, put the header's own conditional inside as a guard, and turn the whole thing inside out.</p>
+
+      <p>Every stage did its job correctly. They were just all reasoning about a loop that didn't exist.</p>
+
+      <h2>The fix is boring, which is how you know it's right</h2>
+
+      <p>A header with several back-edges has <em>one</em> loop, not several. The natural loops of the individual back-edges are subsets of the real thing; you want their union. So: group back-edges by header, union their natural loops, emit one <code>Loop</code> per header.</p>
+
+      <pre><code><span class="c">// group tails by the header they jump to</span>
+<span class="t">Map</span>&lt;<span class="t">IRBlock</span>, <span class="t">Set</span>&lt;<span class="t">IRBlock</span>&gt;&gt; headerToTails = <span class="k">new</span> <span class="t">LinkedHashMap</span>&lt;&gt;();
+<span class="k">for</span> (<span class="k">var</span> entry : backEdges.<span class="fn">entrySet</span>()) {
+    <span class="t">IRBlock</span> tail = entry.<span class="fn">getKey</span>();
+    <span class="k">for</span> (<span class="t">IRBlock</span> header : entry.<span class="fn">getValue</span>()) {
+        headerToTails.<span class="fn">computeIfAbsent</span>(header, k -&gt; <span class="k">new</span> <span class="t">LinkedHashSet</span>&lt;&gt;()).<span class="fn">add</span>(tail);
+    }
+}
+
+<span class="c">// one loop per header: union of every back-edge's natural loop</span>
+<span class="k">for</span> (<span class="k">var</span> entry : headerToTails.<span class="fn">entrySet</span>()) {
+    <span class="t">IRBlock</span> header = entry.<span class="fn">getKey</span>();
+    <span class="t">Set</span>&lt;<span class="t">IRBlock</span>&gt; blocks = <span class="k">new</span> <span class="t">HashSet</span>&lt;&gt;();
+    <span class="k">for</span> (<span class="t">IRBlock</span> tail : entry.<span class="fn">getValue</span>()) {
+        blocks.<span class="fn">addAll</span>(<span class="fn">findNaturalLoop</span>(header, tail));
+    }
+    loops.<span class="fn">add</span>(<span class="k">new</span> <span class="t">Loop</span>(header, blocks));
+}</code></pre>
+
+      <p>The one wrinkle: nesting still has to work. A block inside two genuinely nested loops needs to resolve to the innermost one. So after building the merged loops, map each block to the smallest loop that contains it, and <code>getLoop(block)</code> still returns the tightest enclosing loop.</p>
+
+      <p>With the union in place, <code>assemble</code>'s header now sees both of its in-loop predecessors. <code>findConditionalLatch</code> finds two, hits <code>latch != null</code>, returns null, and the loop is classified as the plain top-tested <code>while</code> it always was. The mesh-building code goes back after the loop. <code>pageQuads</code> gets its quads. The FPS counter came back.</p>
+
+      <h2>What I took away from it</h2>
+
+      <p>The reason this one stuck with me is that at no point did anything <em>fail</em>. There was no exception, no assertion, no malformed graph. A block-partition bug in step three quietly starved a heuristic in step four, and the heuristic gave a confident, well-formed, completely wrong answer. Every layer above it built correctly on top of that answer. The only visible consequence, six layers up, was that some white text had zero vertices.</p>
+
+      <p>If there's a lesson, it's that a heuristic is only as good as the facts you feed it. <code>findConditionalLatch</code> was being fed a lie by a data structure two stages upstream. The check itself was fine. The loop it was checking wasn't a loop.</p>
+
+      <p>I now have a regression test that's just a while loop with two continues followed by code that has to run after it. It's a stupidly small method. It would have caught an entire evening of blaming the font.</p>
+    </div>
+
+    <footer>
+      <p><a href="./">&larr; back to ~/blog</a></p>
+      <p class="copyright">&copy; 2026 TonicBox</p>
+    </footer>
+  </article>
+</body>
+</html>
