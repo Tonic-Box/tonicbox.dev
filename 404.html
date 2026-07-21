@@ -95,7 +95,7 @@
       <span class="dot red"></span>
       <span class="dot yellow"></span>
       <span class="dot green"></span>
-      <span class="title">tonicbox@dev: ~</span>
+      <span class="title" id="title">tonicbox@dev: ~</span>
     </div>
 
     <div class="screen">
@@ -104,7 +104,7 @@
       <p class="line output name">404</p>
       <p class="line output status">[*] that page doesn't exist</p>
 
-      <p class="line"><span class="prompt">tonicbox@dev:~$</span> <a class="link" href="/">cd ~</a></p>
+      <p class="line"><span class="prompt">tonicbox@dev:~$</span> <a class="link" href="/" id="home">cd ~</a></p>
 
       <p class="line"><span class="prompt">tonicbox@dev:~$</span> <span class="cursor"></span></p>
     </div>
@@ -113,5 +113,30 @@
   <footer>
     <span>&copy; 2026 TonicBox</span>
   </footer>
+
+  <script>
+    (function () {
+      var host = location.hostname.split(".")[0];
+      var seg = location.pathname.split("/")[1] || "";
+      var onSubdomain = host === "blog" || host === "portfolio";
+      var section = "";
+      if (host === "blog" || seg === "blog") section = "blog";
+      else if (host === "portfolio" || seg === "portfolio") section = "portfolio";
+
+      var base = section && !onSubdomain ? "/" + section + "/" : "/";
+      var path = section ? "~/" + section : "~";
+
+      var home = document.getElementById("home");
+      if (home) { home.setAttribute("href", base); home.textContent = "cd " + path; }
+
+      var title = document.getElementById("title");
+      if (title) title.textContent = "tonicbox@dev: " + path;
+
+      var prompts = document.querySelectorAll(".prompt");
+      for (var i = 0; i < prompts.length; i++) {
+        prompts[i].textContent = "tonicbox@dev:" + path + "$";
+      }
+    })();
+  </script>
 </body>
 </html>
