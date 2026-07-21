@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TonicBox — Blog</title>
   <meta name="description" content="TonicBox's blog — compilers, Java internals, tooling, and debugging war stories.">
-  <link rel="stylesheet" href="style.css">
+  <link rel="alternate" type="application/atom+xml" title="TonicBox/blog" href="feed.xml">
+  <link rel="stylesheet" href="style.css?v=2">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230b0e14'/><text x='2' y='12' font-family='monospace' font-size='11' fill='%237aa2f7'>&gt;_</text></svg>">
 </head>
 <body>
@@ -16,11 +17,19 @@
     <nav class="links">
       <a href="https://tonicbox.dev">~ home</a>
       <a href="https://github.com/Tonic-Box" target="_blank" rel="noopener">github ↗</a>
+      <a href="feed.xml">rss</a>
     </nav>
   </header>
 
   <main>
     <ul class="post-list">
+      <li>
+        <a class="post-entry" href="rbp-and-only-rbp.html">
+          <span class="date">2026-07-21</span>
+          <h2>RBP, and only RBP: losing a register to SEH</h2>
+          <p class="teaser">Misadventures fighting with Windows over RBP.</p>
+        </a>
+      </li>
       <li>
         <a class="post-entry" href="the-loop-that-ate-its-own-body.html">
           <span class="date">2026-07-15</span>

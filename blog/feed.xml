@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>TonicBox/blog</title>
+  <subtitle>compilers, Java internals, tooling, and debugging war stories</subtitle>
+  <link href="https://blog.tonicbox.dev/feed.xml" rel="self"/>
+  <link href="https://blog.tonicbox.dev/" rel="alternate"/>
+  <id>https://blog.tonicbox.dev/</id>
+  <updated>2026-07-21T12:00:00Z</updated>
+  <author>
+    <name>TonicBox</name>
+    <uri>https://tonicbox.dev</uri>
+  </author>
+
+  <entry>
+    <title>RBP, and only RBP: losing a register to SEH</title>
+    <link href="https://blog.tonicbox.dev/rbp-and-only-rbp.html" rel="alternate"/>
+    <id>https://blog.tonicbox.dev/rbp-and-only-rbp.html</id>
+    <published>2026-07-21T12:00:00Z</published>
+    <updated>2026-07-21T12:00:00Z</updated>
+    <summary>Misadventures fighting with Windows over RBP.</summary>
+  </entry>
+
+  <entry>
+    <title>The loop that ate its own body</title>
+    <link href="https://blog.tonicbox.dev/the-loop-that-ate-its-own-body.html" rel="alternate"/>
+    <id>https://blog.tonicbox.dev/the-loop-that-ate-its-own-body.html</id>
+    <published>2026-07-15T12:00:00Z</published>
+    <updated>2026-07-15T12:00:00Z</updated>
+    <summary>A missing FPS counter, an empty mesh, and the decompiler bug behind them: how two continue statements convinced YABR's reconstructor to turn a while loop inside out.</summary>
+  </entry>
+</feed>

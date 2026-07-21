@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RBP, and only RBP: losing a register to SEH — TonicBox</title>
+  <meta name="description" content="A Windows x64 SEH unwind bug: the frame register borrowed for an unwind trampoline gets overwritten by the OS the moment the handler is delivered. Bisecting a virtualizer bug down to exactly one register.">
+  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230b0e14'/><text x='2' y='12' font-family='monospace' font-size='11' fill='%237aa2f7'>&gt;_</text></svg>">
+</head>
+<body>
+  <article>
+    <header class="post-head">
+      <nav class="links">
+        <a href="./">&larr; ~/blog</a>
+        <a href="https://tonicbox.dev">~ home</a>
+      </nav>
+      <h1>RBP, and only RBP: losing a register to SEH</h1>
+      <p class="meta">2026-07-21 &middot; TonicBox</p>
+    </header>
+
+    <div class="post-body">
+      <p>TVP virtualizes functions. It lifts a function's machine code into bytecode and runs that bytecode in an interpreter baked into the target binary. A virtualized function can still call back out to ordinary native code, and that native code can throw a C++ exception, and when it does the exception has to unwind back through the interpreter and find the original caller's <code>catch</code>. Getting that to work at all took a while.</p>
+
+      <p>The short version, because the story needs it: the interpreter and its call-out trampolines live in a blob I inject into the host image, and that blob has no <code>.pdata</code>. So when an exception unwinds into it, <a href="https://learn.microsoft.com/en-us/windows/win32/api/winnt/nf-winnt-rtllookupfunctionentry" target="_blank" rel="noopener"><code>RtlLookupFunctionEntry</code></a> returns NULL, Windows applies the <a href="https://learn.microsoft.com/en-us/cpp/build/prolog-and-epilog?view=msvc-170" target="_blank" rel="noopener">leaf-function rule</a> - <code>RIP = [RSP]; RSP += 8</code> - to a slot that is not a return address, and the unwind walks off a cliff. I have a Frida trace where it eventually treats the exception code itself, <code>0x20474343</code>, as a return address and jumps to it. Total derail.</p>
+
+      <p>The fix was to inject a fake <a href="https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-runtime_function" target="_blank" rel="noopener"><code>RUNTIME_FUNCTION</code></a> over the blob and hand-write its <code>UNWIND_INFO</code> so the unwind lands exactly on the native caller. One unwind code: <a href="https://learn.microsoft.com/en-us/cpp/build/exception-handling-x64?view=msvc-170" target="_blank" rel="noopener"><code>UWOP_SET_FPREG</code></a>, frame register RBP. Before the native call, <code>tvp_ncall</code> sets RBP to the caller's return-address slot. The unwinder does <code>RSP = RBP; RIP = [RSP]; RSP += 8</code>, arrives at the caller, and the caller's own <code>.pdata</code> drives its <code>catch</code>. Byte-identical to native.</p>
+
+      <p>Then it wasn't.</p>
+
+      <h2>The one-argument version was fine</h2>
+
+      <p>The repro is small:</p>
+
+      <pre><code><span class="k">extern</span> <span class="s">"C"</span> <span class="k">__declspec</span>(dllexport)
+<span class="t">int</span> <span class="fn">inner</span>(<span class="t">int</span> x)
+{
+    <span class="k">if</span> (x == <span class="n">0</span>) <span class="k">throw</span> <span class="n">7</span>;
+    <span class="k">return</span> x + <span class="n">1</span>;
+}
+
+<span class="t">int</span> <span class="fn">outer</span>(<span class="t">int</span> x)
+{
+    <span class="k">try</span> {
+        <span class="k">return</span> <span class="fn">inner</span>(x);
+    } <span class="k">catch</span> (<span class="t">int</span> e) {
+        <span class="k">return</span> e * <span class="n">100</span>;
+    }
+}
+
+<span class="k">static</span> <span class="t">int</span> <span class="fn">sidefn</span>(<span class="t">int</span> x)
+{
+    <span class="k">return</span> x * <span class="n">7</span> + <span class="n">3</span>;
+}
+
+<span class="t">int</span> <span class="fn">main</span>()
+{
+    <span class="t">int</span> x = <span class="fn">read_x</span>();
+    <span class="fn">printf</span>(<span class="s">"v %d %d\n"</span>, <span class="fn">outer</span>(x), <span class="fn">sidefn</span>(x));
+}</code></pre>
+
+      <p>I virtualize <code>inner</code>, run with <code>x=0</code>. Native prints <code>v 700 3</code>. The virtualized build printed garbage, a nonsense value where the <code>700</code> should be, sometimes a crash.</p>
+
+      <p>So I cut the second argument. <code>printf("v %d\n", outer(x))</code>, nothing else. Byte-identical. Put it back, garbage again. The bug cared about the second value being printed, which made no sense - <code>outer</code> catches, <code>outer</code> returns, <code>sidefn</code> never touches the exception path. Whatever was broken lived in the caller, not the callee.</p>
+
+      <p>That was it, actually, I just didn't read it yet. <code>printf</code> with two arguments needs one of them held somewhere across the <code>call outer</code>. <code>printf</code> with one doesn't.</p>
+
+      <h2>Which register</h2>
+
+      <p>So I dug into what <code>main</code> kept live across the throwing call. Same virtualized <code>inner</code> each time, <code>-O1</code>, only <code>main</code>'s register pressure changing.</p>
+
+      <ul>
+        <li>One argument, nothing held live across the call - byte-identical.</li>
+        <li>Two arguments, <code>main</code> leaves its loop pointers in RBX, RSI, RDI across <code>call outer</code> - byte-identical.</li>
+        <li>Two arguments, <code>main</code> additionally parks <code>&amp;fmt</code> in RBP across <code>call outer</code> - garbage.</li>
+      </ul>
+
+      <p>RBX, RSI, RDI: fine. RBP: broken. The corrupted register was RBP and only RBP, and the <a href="https://itanium-cxx-abi.github.io/cxx-abi/abi-eh.html" target="_blank" rel="noopener">personality routine</a> restores all eight callee-saved registers the same way, from the same saved snapshot. <code>seh.zig:710</code> literally does <code>context.rbp = g.regs[5]</code>. It runs. RBX/RSI/RDI take the identical treatment two lines up and they come out right.</p>
+
+      <p>One register's restore was getting thrown away and it was the one I'd picked as the frame register.</p>
+
+      <h2>The frame register is not yours to keep</h2>
+
+      <p>Here's the part I'd waved past when I built the bridge. <code>UWOP_SET_FPREG</code> doesn't just help my unwind land on the caller.. it tells Windows that RBP <em>is</em> this frame's frame pointer. And when the unwinder delivers a handler, it derives the frame register for the establishing frame from the stack itself. It reads the slot. Whatever <a href="https://learn.microsoft.com/en-us/windows/win32/api/winnt/nf-winnt-rtlvirtualunwind" target="_blank" rel="noopener"><code>RtlVirtualUnwind</code></a> computes for RBP is what the <code>catch</code> gets. My personality writes <code>context.rbp</code> afterward and the dispatcher has already moved on; the write lands on a copy nobody reads.</p>
+
+      <p>The non-frame registers don't go through that path. RBX, RSI, RDI pass through the personality's restore untouched and arrive intact. That asymmetry (three registers faithful, one clobbered) is the entire bug, and it's not a missing restore. It's structural. I chose RBP to carry the caller's return-address slot for the teleport, and a caller who also wanted RBP for a live value couldn't have it, because those are the same register and the unwinder wins.</p>
+
+      <p>I proved it with Frida, staying off the unwinder itself. I have a standing aversion against putting an Interceptor on <code>RtlVirtualUnwind</code>, it destabilizes the thing you're measuring. Hooks on <code>printf</code>, on <code>outer</code>'s entry, on <code>outer</code>'s landing pad, on <code>__cxa_begin_catch</code>, all libstdc++ and CRT. At <code>outer</code>'s entry, <code>rbp = &amp;fmt</code>. Correct - <code>main</code> passed its true RBP into the frameless <code>outer</code>. At <code>outer</code>'s landing pad, <code>rbp</code> = the slot. The <code>SET_FPREG</code> establisher, <code>g.regs[4]</code>, <code>inner</code>'s return-address slot. The OS handed the <code>catch</code> its frame register set to my teleport base, <code>outer</code> is frameless so it has no <code>pop rbp</code> to undo it, and it returned that straight to <code>main</code> as a format pointer.</p>
+
+      <pre><code>OUTER-ENTRY    rbp = &amp;fmt         <span class="s">ok</span>
+OUTER-LANDPAD  rbp = &lt;the slot&gt;   <span class="bad">wrong</span></code></pre>
+
+      <p>And <code>outer</code> has nothing to undo it with. It's frameless. The whole frame is the <a href="https://learn.microsoft.com/en-us/cpp/build/stack-usage?view=msvc-170" target="_blank" rel="noopener">shadow space</a> for the <code>call</code>, and neither exit touches RBP:</p>
+
+      <pre><code><span class="fn">outer:</span>                    <span class="c">; no push rbp</span>
+    <span class="k">sub</span>   <span class="t">rsp</span>, <span class="n">0x28</span>       <span class="c">; shadow space for the call - that's the entire frame</span>
+    <span class="k">call</span>  <span class="fn">inner</span>
+    <span class="c">; ... normal path: result in eax, fall through</span>
+    <span class="k">add</span>   <span class="t">rsp</span>, <span class="n">0x28</span>
+    <span class="k">ret</span>
+
+<span class="fn">.Lcatch:</span>                  <span class="c">; personality lands here; caught int reached via __cxa_begin_catch</span>
+    <span class="c">; e * 100 in eax</span>
+    <span class="k">add</span>   <span class="t">rsp</span>, <span class="n">0x28</span>
+    <span class="k">ret</span>                   <span class="c">; no pop rbp - RBP leaves as whatever the unwinder set it to</span></code></pre>
+
+      <p>Whatever the unwinder wrote into RBP on the way to <code>.Lcatch</code> is what <code>main</code> gets back.</p>
+
+      <p>The reason it lives on a separate stack at all is that the interpreter runs on its own pool stack, so there's no single continuous chain from the throwing callee back to <code>main</code> - the boundary <code>UNWIND_INFO</code> is what teleports across the gap.</p>
+
+      <figure class="graph">
+        <img src="rbp-unwind.svg" alt="Diagram: main calls outer on the thread stack; outer makes a vcall into tvp_dispatch on a separate pool stack, which ncalls the native thrower; on throw 7 the unwind returns to tvp_dispatch, which uses a SET_FPREG teleport on RBP to jump back to outer's frame on the thread stack.">
+        <figcaption>Two stacks, one teleport across the gap.</figcaption>
+      </figure>
+
+      <h2>Going frameless</h2>
+
+      <p>The obvious move: stop using a frame register. If nothing names RBP the frame pointer, nothing clobbers it.</p>
+
+      <p>So I tried that. Three variants of a frameless boundary, each with <code>tvp_ncall</code> loading the caller's real RBP itself: a small <code>UWOP_ALLOC_SMALL(8)</code> with a matching <code>sub</code>, a true zero-code leaf with the handler RVA moved to offset 4, and one lone <code>UWOP_SAVE_NONVOL</code> that changed no RSP at all and kept the exact prior 16-byte layout.</p>
+
+      <p>Every one of them called <code>terminate</code>. Including <code>e4v1</code> and <code>e4v3</code> - the cases that had been byte-identical with <code>SET_FPREG</code>. Now nothing found <code>outer</code>'s catch, not even the shapes that worked a minute ago.</p>
+
+      <p>The boundary frame's incoming RSP is not the caller's slot, so the unwind has to set RSP to an absolute value to cross the gap, and <code>UWOP_SET_FPREG</code> is the only op in the x64 unwind encoding that sets RSP absolutely. Everything else is a delta off the current RSP. And the one op that sets RSP absolutely requires a frame register. There is no frameless way to do the thing the frameless approach was for. I hadn't picked RBP out of preference, I'd picked it out of the only option, and forgotten that.</p>
+
+      <h2>Rebuilding the stack</h2>
+
+      <p>If the pool stack is the reason the unwind can't just walk home, get rid of the pool stack. Run the interpreter on a window carved out of the caller's own stack, continuous, walkable, and then ordinary RSP-relative unwinding reaches the caller with no frame register and all eight nonvolatiles intact.</p>
+
+      <p>So, I rewrote <code>tvp_dispatch</code> to run on a reserved real-stack window, no <code>.bss</code> pool, no switch. That revealed a requirement I'd missed - the pool was pre-committed <code>.bss</code>, so it never had to grow, but a real-stack window does, and Windows only grows the stack one <a href="https://learn.microsoft.com/en-us/windows/win32/memory/creating-guard-pages" target="_blank" rel="noopener">guard page</a> at a time. A single <code>sub rsp,0x10000</code> jumps clean over the guard page and faults. So the window needs a stack-probe loop that touches each page walking down.</p>
+
+      <p>A non-EH virtualized function on the new window: byte-identical. The foundation was sound. The throw path segfaulted. Once the interpreter's frames were real and walkable, the single synthetic whole-<code>.text</code> <code>SET_FPREG</code> boundary derailed on them. The unwinder now saw genuine blob frames where it used to see one flat span. Step one and step two: real-stack window, and per-function unwind data for every naked blob routine were not separable, and I'd only proven that by doing step one and watching it break.</p>
+
+      <h2>R15 instead</h2>
+
+      <p>I went back to the register.</p>
+
+      <p>I stopped trying to watch the unwinder from outside and instrumented the personality itself - my own <code>tvp_seh</code>, the legitimate registered routine, no ntdll hooks. Log the full CONTEXT at every phase-1 and phase-2 call. Ground truth, from inside the mechanism, which said what Frida had implied: the frame register is delivered as the establisher and my restore of it is discarded, and only the frame register.</p>
+
+      <p>So don't make the caller fight for RBP. Move the sacrifice to a register the caller almost never wants.</p>
+
+      <pre><code><span class="c">// boundary UNWIND_INFO: frame register RBP -> R15</span>
+unw_frame = <span class="n">15</span>;
+
+<span class="c">// tvp_ncall / tvp_fault, last thing before the native call:</span>
+regs_rbp = g.regs[<span class="n">5</span>];   <span class="c">// caller's TRUE rbp, an ordinary nonvolatile now — survives delivery</span>
+regs_r15 = g.regs[<span class="n">4</span>];   <span class="c">// the SET_FPREG teleport base — this is the one that gets eaten</span></code></pre>
+
+      <p>RBP goes back to being a plain callee-saved register that flows through <code>__cxa_throw</code> and arrives at the <code>catch</code> intact. R15 becomes the frame register and takes the clobber. <code>e4b</code>, <code>e4v1</code>, <code>e4v3</code>, <code>e4v4</code> - all byte-identical, including the two that were garbage on the floor.</p>
+
+      <h2>Where the bug went</h2>
+
+      <p>It didn't close, exactly. It moved.</p>
+
+      <p>A caller holding a live value in R15 across a throwing virtualized call, caught by an intermediate frame, still gets it clobbered - same mechanism, different register. That case is rarer than the RBP one it replaced, because GCC allocates RBX, RBP, and R12 before it ever reaches R13 through R15, so a function has to be under real register pressure before R15 holds anything live across a call. Rarer, not gone.</p>
+
+      <p>The only actual fix is the stack rearchitecture - continuous frames, no teleport, no sacrificed register - and that's the redesign I reverted, waiting for its own session. Until then the bridge trades a common corruption for an uncommon one and documents the trade. Which is the whole discipline of this thing: I'll take faithful-or-native over a bridge that's wrong in a way nobody wrote down.</p>
+    </div>
+
+    <footer>
+      <p><a href="./">&larr; back to ~/blog</a></p>
+      <p class="copyright">&copy; 2026 TonicBox</p>
+    </footer>
+  </article>
+</body>
+</html>
