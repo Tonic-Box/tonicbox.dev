@@ -8,6 +8,7 @@
   --blue: #7aa2f7;
   --red: #f7768e;
   --yellow: #e0af68;
+  --purple: #bb9af7;
   --font: "Cascadia Code", "JetBrains Mono", "Fira Code", Consolas, "SF Mono", monospace;
 }
 
@@ -123,7 +124,7 @@ body {
 .fetch-key {
   display: inline-block;
   width: 5em;
-  color: var(--green);
+  color: var(--purple);
   font-weight: 600;
 }
 
@@ -133,6 +134,10 @@ body {
 
 .value {
   color: var(--blue);
+}
+
+.purple {
+  color: var(--purple);
 }
 
 .output.status {
