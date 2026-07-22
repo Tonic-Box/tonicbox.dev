@@ -174,3 +174,56 @@ footer {
   .output.name { font-size: 1.4rem; }
   .screen { padding: 1rem 1rem 1.4rem; }
 }
+
+/* interactive terminal (desktop only, injected by terminal.js) */
+.screen.interactive {
+  max-height: min(68vh, 560px);
+  overflow-y: auto;
+}
+
+.term-output pre:not(.ascii) {
+  font-family: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
+
+.cmd-line {
+  margin-top: 0.35rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.term-input-line {
+  display: flex;
+  align-items: baseline;
+  margin-top: 0.35rem;
+}
+
+.cmd-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: 0.6ch;
+  background: none;
+  border: none;
+  outline: none;
+  padding: 0;
+  color: var(--text);
+  font: inherit;
+  line-height: inherit;
+  caret-color: var(--text);
+}
+
+.term-dir { color: var(--blue); }
+.term-cmd { color: var(--green); }
+.term-error { color: var(--red); }
+
+.type-cursor {
+  display: inline-block;
+  width: 0.55em;
+  height: 1.05em;
+  background: var(--text);
+  vertical-align: text-bottom;
+  margin-left: 1px;
+  animation: blink 1.1s steps(1) infinite;
+}
