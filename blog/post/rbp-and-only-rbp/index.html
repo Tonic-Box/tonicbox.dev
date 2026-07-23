@@ -154,7 +154,6 @@ regs_r15 = g.regs[<span class="n">4</span>];   <span class="c">// the SET_FPREG 
 
       <p>A caller holding a live value in R15 across a throwing virtualized call, caught by an intermediate frame, still gets it clobbered - same mechanism, different register. That case is rarer than the RBP one it replaced, because GCC allocates RBX, RBP, and R12 before it ever reaches R13 through R15, so a function has to be under real register pressure before R15 holds anything live across a call. Rarer, not gone.</p>
 
-      <p>The only actual fix is the stack rearchitecture - continuous frames, no teleport, no sacrificed register - and that's the redesign I reverted, waiting for its own session. Until then the bridge trades a common corruption for an uncommon one and documents the trade. Which is the whole discipline of this thing: I'll take faithful-or-native over a bridge that's wrong in a way nobody wrote down.</p>
     </div>
 
     <footer>
