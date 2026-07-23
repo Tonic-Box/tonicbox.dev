@@ -1,26 +1,139 @@
 /*
  * TonicBox interactive terminal.
- * On desktop it loads the TonicBoxOS wasm image and becomes a real shell over
- * it; `neofetch` is intercepted host-side to render the rich landing card.
- * Mobile / no-JS keep the static markup untouched.
+ * Progressive enhancement: on desktop (has a mouse) it takes over the static
+ * .screen and becomes a small shell over a virtual Linux-shaped filesystem.
+ * Mobile / no-JS / crawlers keep the static markup untouched.
  */
 (function () {
   "use strict";
 
   var screenEl = document.querySelector(".screen");
   var titleEl = document.querySelector(".titlebar .title");
-  var greenDot = document.querySelector(".titlebar .dot.green");
-  var terminalEl = document.querySelector(".terminal");
   if (!screenEl) return;
+
+  // Only enhance where there's a real pointer (desktop). Everyone else keeps
+  // the static fallback already in the HTML.
   if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
 
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var PROMPT = "tonicbox@dev:~$";
+
+  var USER = "tonicbox";
+  var HOST = "dev";
   var HOME = "/home/tonicbox";
   var ASCII = "  ╱|、\n(˚ˎ 。7\n|、˜〵\nじしˍ,)ノ";
-  var enc = new TextEncoder();
-  var dec = new TextDecoder();
-  var wasm = null;
+
+  /* ------------------------------------------------------------------ VFS */
+
+  function d(children) { return { type: "dir", children: children || {} }; }
+  function f(content) { return { type: "file", content: content }; }
+
+  var aboutTxt = [
+    "TonicBox",
+    "--------",
+    "Security researcher, software engineer, anime weeb.",
+    "",
+    "I build low-level tooling: compilers, program analysis, JVM",
+    "internals, and the occasional reverse-engineering rabbit hole.",
+    "",
+    "focus: development, reversing, research & writeups"
+  ].join("\n");
+
+  var contactTxt = [
+    "email    gsec.tonicbox@protonmail.com",
+    "discord  tonicbox",
+    "twitter  x.com/Tonic_Box",
+    "github   github.com/Tonic-Box"
+  ].join("\n");
+
+  var osRelease = [
+    'NAME="TonicBoxOS"',
+    'PRETTY_NAME="TonicBoxOS (rolling)"',
+    "ID=tonicbox",
+    'VERSION="rolling"',
+    'HOME_URL="https://tonicbox.dev"'
+  ].join("\n");
+
+  var readme = [
+    "# ~",
+    "",
+    "You're in an interactive shell. Poke around:",
+    "  ls              list files",
+    "  cat about.txt   read a file",
+    "  links           blog & portfolio",
+    "  help            all commands"
+  ].join("\n");
+
+  var fs = d({
+    bin: d({ ls: f(""), cd: f(""), cat: f(""), clear: f(""), echo: f(""), neofetch: f("") }),
+    boot: d({}),
+    dev: d({ null: f(""), zero: f(""), random: f(""), tty: f("") }),
+    etc: d({
+      hostname: f("dev\n"),
+      "os-release": f(osRelease + "\n"),
+      motd: f("Welcome to TonicBoxOS.\nType `help` to see available commands.\n"),
+      passwd: f("root:x:0:0:root:/root:/bin/bash\ntonicbox:x:1000:1000:TonicBox:/home/tonicbox:/bin/bash\n")
+    }),
+    home: d({
+      tonicbox: d({
+        ".bashrc": f("# nothing to see here... try 'help'\n"),
+        ".profile": f("export PATH=$HOME/bin:$PATH\n"),
+        "about.txt": f(aboutTxt + "\n"),
+        "contact.txt": f(contactTxt + "\n"),
+        "README.md": f(readme + "\n"),
+        projects: d({
+          "NOTES.txt": f("Public repos live on GitHub. Run `links` for the portfolio.\n")
+        })
+      })
+    }),
+    lib: d({}),
+    opt: d({}),
+    proc: d({}),
+    root: d({ ".secret": f("nice try :)\n"), "flag.txt": f("you found it. gg.\n") }),
+    sbin: d({}),
+    tmp: d({}),
+    usr: d({ bin: d({}), lib: d({}), local: d({}), share: d({}) }),
+    var: d({ log: d({}), tmp: d({}) })
+  });
+
+  var cwd = ["home", "tonicbox"];
+
+  function resolveParts(pathStr) {
+    pathStr = (pathStr || "").trim();
+    var parts;
+    if (pathStr === "" || pathStr === "~") return HOME.split("/").filter(Boolean);
+    if (pathStr.indexOf("~/") === 0) { parts = HOME.split("/").filter(Boolean); pathStr = pathStr.slice(2); }
+    else if (pathStr.charAt(0) === "/") { parts = []; pathStr = pathStr.slice(1); }
+    else parts = cwd.slice();
+    var segs = pathStr.split("/");
+    for (var i = 0; i < segs.length; i++) {
+      var s = segs[i];
+      if (s === "" || s === ".") continue;
+      if (s === "..") { if (parts.length) parts.pop(); continue; }
+      parts.push(s);
+    }
+    return parts;
+  }
+
+  function getNode(parts) {
+    var node = fs;
+    for (var i = 0; i < parts.length; i++) {
+      if (node.type !== "dir") return null;
+      node = node.children[parts[i]];
+      if (!node) return null;
+    }
+    return node;
+  }
+
+  function prettyPath(parts) {
+    var full = "/" + parts.join("/");
+    if (full === HOME) return "~";
+    if (full.indexOf(HOME + "/") === 0) return "~" + full.slice(HOME.length);
+    return parts.length ? full : "/";
+  }
+
+  function promptStr() { return USER + "@" + HOST + ":" + prettyPath(cwd) + "$"; }
+
+  /* -------------------------------------------------------------- helpers */
 
   function esc(s) {
     return String(s).replace(/[&<>"]/g, function (c) {
@@ -28,12 +141,12 @@
     });
   }
 
-  /* ------------------------------------------------------------- DOM */
   var outputEl, inputLine, promptEl, input;
 
   function buildDom() {
     screenEl.className = "screen interactive";
     screenEl.innerHTML = "";
+
     outputEl = document.createElement("div");
     outputEl.className = "term-output";
     screenEl.appendChild(outputEl);
@@ -41,9 +154,10 @@
     inputLine = document.createElement("div");
     inputLine.className = "term-input-line";
     inputLine.style.display = "none";
+
     promptEl = document.createElement("span");
     promptEl.className = "prompt";
-    promptEl.textContent = PROMPT;
+
     input = document.createElement("input");
     input.className = "cmd-input";
     input.type = "text";
@@ -52,6 +166,7 @@
     input.setAttribute("autocapitalize", "off");
     input.setAttribute("autocorrect", "off");
     input.setAttribute("spellcheck", "false");
+
     inputLine.appendChild(promptEl);
     inputLine.appendChild(input);
     screenEl.appendChild(inputLine);
@@ -69,203 +184,180 @@
   }
 
   function echoCommand(cmd) {
-    var p = document.createElement("p");
-    p.className = "line";
-    p.innerHTML = '<span class="prompt">' + esc(PROMPT) + "</span> " + esc(cmd);
-    outputEl.appendChild(p);
+    var line = document.createElement("p");
+    line.className = "line";
+    line.innerHTML = '<span class="prompt">' + esc(promptStr()) + "</span> " + esc(cmd);
+    outputEl.appendChild(line);
     scrollBottom();
   }
 
-  function appendText(text) {
-    if (!text) return;
-    text = text.replace(/\n+$/, "");
-    if (!text) return;
-    append(esc(text));
+  function updatePrompt() {
+    promptEl.textContent = promptStr();
+    if (titleEl) titleEl.textContent = USER + "@" + HOST + ": " + prettyPath(cwd);
   }
 
-  /* -------------------------------------------------- rich cards (host) */
+  /* ------------------------------------------------------------- commands */
+
+  function infoLine(k, v) {
+    return '<p class="fetch-line"><span class="fetch-key">' + k + "</span>: " + v + "</p>";
+  }
+
   function renderNeofetch() {
     var html =
-      '<div class="fetch"><pre class="ascii">' + ASCII + "</pre><div class=\"fetch-info\">" +
-      '<p class="output name">TonicBox</p>' +
-      '<p class="fetch-line"><span class="fetch-key">about</span>: Security researcher, software engineer, anime weeb.</p>' +
-      '<p class="fetch-line"><span class="fetch-key">email</span>: <a class="link" href="mailto:gsec.tonicbox@protonmail.com">gsec.tonicbox@protonmail.com</a></p>' +
-      '<p class="fetch-line"><span class="fetch-key">discord</span>: <a class="link" href="https://discordapp.com/users/246089066188111873" target="_blank" rel="noopener">tonicbox</a></p>' +
-      '<p class="fetch-line"><span class="fetch-key">twitter</span>: <a class="link" href="https://x.com/Tonic_Box" target="_blank" rel="noopener">Tonic_Box</a></p>' +
-      '<p class="fetch-line"><span class="fetch-key">github</span>: <a class="link" href="https://github.com/Tonic-Box" target="_blank" rel="noopener">Tonic-Box</a></p>' +
-      "</div></div>";
+      '<div class="fetch">' +
+        '<pre class="ascii">' + ASCII + "</pre>" +
+        '<div class="fetch-info">' +
+          '<p class="output name">TonicBox</p>' +
+          infoLine("about", "Security researcher, software engineer, anime weeb.") +
+          infoLine("email", '<a class="link" href="mailto:gsec.tonicbox@protonmail.com">gsec.tonicbox@protonmail.com</a>') +
+          infoLine("discord", '<a class="link" href="https://discordapp.com/users/246089066188111873" target="_blank" rel="noopener">tonicbox</a>') +
+          infoLine("twitter", '<a class="link" href="https://x.com/Tonic_Box" target="_blank" rel="noopener">Tonic_Box</a>') +
+          infoLine("github", '<a class="link" href="https://github.com/Tonic-Box" target="_blank" rel="noopener">Tonic-Box</a>') +
+        "</div>" +
+      "</div>";
     var wrap = document.createElement("div");
     wrap.innerHTML = html;
     outputEl.appendChild(wrap.firstChild);
     scrollBottom();
   }
 
-  /* ------------------------------------------------------- wasm bridge */
-  function feedWasm(cmd) {
-    if (!wasm) return "(TonicBoxOS still loading, one sec...)";
-    wasm.out_reset();
-    var b = enc.encode(cmd + "\n");
-    new Uint8Array(wasm.memory.buffer, wasm.image_ptr(), b.length).set(b);
-    wasm.stdin_push(b.length);
-    wasm.run(30000000);
-    return dec.decode(new Uint8Array(wasm.memory.buffer, wasm.out_ptr(), wasm.out_len()));
+  function renderLinks() {
+    append('<a class="link" href="https://blog.tonicbox.dev"><span class="purple">blog</span> - compilers, tooling, and misadventures</a>');
+    append('<a class="link" href="https://portfolio.tonicbox.dev"><span class="purple">portfolio</span> - personal projects showcase</a>');
   }
 
-  function updatePrompt() {
-    if (!wasm) return;
-    var n = wasm.cwd_len_get();
-    var cwd = dec.decode(new Uint8Array(wasm.memory.buffer, wasm.cwd_ptr(), n));
-    var disp = cwd;
-    if (cwd === HOME) disp = "~";
-    else if (cwd.indexOf(HOME + "/") === 0) disp = "~" + cwd.slice(HOME.length);
-    var root = wasm.fg_euid && wasm.fg_euid() === 0;
-    PROMPT = (root ? "root@dev:" : "tonicbox@dev:") + disp + (root ? "#" : "$");
-    if (promptEl) {
-      promptEl.textContent = PROMPT;
-      promptEl.className = root ? "prompt root" : "prompt";
-    }
-  }
+  var COMMANDS = {
+    help: function () {
+      var rows = [
+        ["help", "show this message"],
+        ["ls", "list directory contents"],
+        ["cd", "change directory"],
+        ["cat", "print a file"],
+        ["clear", "clear the screen"],
+        ["neofetch", "system info card"],
+        ["links", "blog & portfolio"]
+      ];
+      var body = rows.map(function (r) {
+        var pad = " ".repeat(Math.max(1, 12 - r[0].length));
+        return '  <span class="term-cmd">' + r[0] + "</span>" + pad + esc(r[1]);
+      }).join("\n");
+      append("<pre>" + body + "</pre>");
+    },
 
-  /* ---------------------------- VT100 screen (raw-tty apps, e.g. vi) */
-  var COLS = 80, ROWS = 24;
-  var screenMode = false;
-  var grid = null, attr = null, curR = 0, curC = 0, curAttr = 0, vtEl = null;
-
-  function initGrid() {
-    grid = []; attr = [];
-    for (var r = 0; r < ROWS; r++) {
-      var row = [], arow = [];
-      for (var c = 0; c < COLS; c++) { row.push(" "); arow.push(0); }
-      grid.push(row); attr.push(arow);
-    }
-    curR = 0; curC = 0; curAttr = 0;
-  }
-  function clearGrid() { for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) { grid[r][c] = " "; attr[r][c] = 0; } }
-
-  function applyVT(s) {
-    var i = 0;
-    while (i < s.length) {
-      var ch = s.charCodeAt(i);
-      if (ch === 27 && s.charCodeAt(i + 1) === 91) {
-        i += 2;
-        var params = "";
-        while (i < s.length) { var cc = s.charCodeAt(i); if ((cc >= 48 && cc <= 57) || cc === 59) { params += s[i]; i++; } else break; }
-        var cmd = s[i]; i++;
-        var p = params.split(";");
-        if (cmd === "H") { curR = Math.max(0, Math.min(ROWS - 1, (parseInt(p[0]) || 1) - 1)); curC = Math.max(0, Math.min(COLS - 1, (parseInt(p[1]) || 1) - 1)); }
-        else if (cmd === "J") { if (params === "2" || params === "") clearGrid(); }
-        else if (cmd === "K") { for (var c2 = curC; c2 < COLS; c2++) { grid[curR][c2] = " "; attr[curR][c2] = 0; } }
-        else if (cmd === "m") { for (var pi = 0; pi < p.length; pi++) { var n = parseInt(p[pi]) || 0; if (n === 7) curAttr = 1; else if (n === 0 || n === 27) curAttr = 0; } }
-      } else if (ch === 13) { curC = 0; i++; }
-      else if (ch === 10) { curR = Math.min(ROWS - 1, curR + 1); i++; }
-      else if (ch === 8) { curC = Math.max(0, curC - 1); i++; }
-      else { if (ch >= 32 && curC < COLS) { grid[curR][curC] = s[i]; attr[curR][curC] = curAttr; curC++; } i++; }
-    }
-  }
-  function renderScreen() {
-    var html = "";
-    for (var r = 0; r < ROWS; r++) {
-      for (var c = 0; c < COLS; c++) {
-        var e = esc(grid[r][c]);
-        if (r === curR && c === curC) html += '<span class="vt-cursor">' + e + "</span>";
-        else if (attr[r][c]) html += '<span class="vt-rev">' + e + "</span>";
-        else html += e;
+    ls: function (args) {
+      var showAll = false, longFmt = false, pathArg = null;
+      args.forEach(function (a) {
+        if (a.charAt(0) === "-") {
+          if (a.indexOf("a") > -1) showAll = true;
+          if (a.indexOf("l") > -1) longFmt = true;
+        } else pathArg = a;
+      });
+      var parts = resolveParts(pathArg == null ? "." : pathArg);
+      var node = getNode(parts);
+      if (!node) { append("ls: cannot access '" + esc(pathArg) + "': No such file or directory", "term-error"); return; }
+      if (node.type === "file") { append(esc(pathArg)); return; }
+      var names = Object.keys(node.children);
+      if (!showAll) names = names.filter(function (n) { return n.charAt(0) !== "."; });
+      names.sort();
+      if (!names.length) { append(""); return; }
+      if (longFmt) {
+        var lines = names.map(function (n) {
+          var c = node.children[n];
+          var head = (c.type === "dir" ? "drwxr-xr-x" : "-rw-r--r--") + "  " + USER + "  " + USER + "  ";
+          var nm = c.type === "dir" ? '<span class="term-dir">' + esc(n) + "</span>" : esc(n);
+          return head + nm;
+        });
+        append("<pre>" + lines.join("\n") + "</pre>");
+      } else {
+        var cells = names.map(function (n) {
+          var c = node.children[n];
+          return c.type === "dir" ? '<span class="term-dir">' + esc(n) + "</span>" : esc(n);
+        });
+        append("<pre>" + cells.join("   ") + "</pre>");
       }
-      if (r < ROWS - 1) html += "\n";
-    }
-    vtEl.innerHTML = html;
-  }
-  function enterScreenMode() {
-    screenMode = true;
-    inputLine.style.display = "none";
-    outputEl.style.display = "none";
-    if (!vtEl) { vtEl = document.createElement("pre"); vtEl.className = "vt-screen"; screenEl.appendChild(vtEl); }
-    vtEl.style.display = "block";
-    initGrid();
-  }
-  function exitScreenMode() {
-    screenMode = false;
-    if (vtEl) vtEl.style.display = "none";
-    outputEl.style.display = "";
-    updatePrompt();
-    showPrompt();
-  }
-  function feedRaw(bytes) {
-    if (!wasm) return;
-    wasm.out_reset();
-    var b = new Uint8Array(bytes);
-    new Uint8Array(wasm.memory.buffer, wasm.image_ptr(), b.length).set(b);
-    wasm.stdin_push(b.length);
-    wasm.run(30000000);
-    applyVT(dec.decode(new Uint8Array(wasm.memory.buffer, wasm.out_ptr(), wasm.out_len())));
-    renderScreen();
-    if (wasm.fg_raw && wasm.fg_raw() === 0) exitScreenMode();
-  }
-  function keyBytes(e) {
-    var k = e.key;
-    if (k === "ArrowUp") return [27, 91, 65];
-    if (k === "ArrowDown") return [27, 91, 66];
-    if (k === "ArrowRight") return [27, 91, 67];
-    if (k === "ArrowLeft") return [27, 91, 68];
-    if (k === "Enter") return [13];
-    if (k === "Backspace") return [127];
-    if (k === "Escape") return [27];
-    if (k === "Tab") return [9];
-    if (k.length === 1) return [e.ctrlKey ? (k.charCodeAt(0) & 0x1f) : k.charCodeAt(0)];
-    return null;
-  }
+    },
 
-  var history = [];
+    cd: function (args) {
+      var target = "";
+      for (var i = 0; i < args.length; i++) { if (args[i].charAt(0) !== "-") { target = args[i]; break; } }
+      var parts = resolveParts(target);
+      var node = getNode(parts);
+      if (!node) { append("cd: " + esc(target) + ": No such file or directory", "term-error"); return; }
+      if (node.type !== "dir") { append("cd: " + esc(target) + ": Not a directory", "term-error"); return; }
+      cwd = parts;
+      updatePrompt();
+    },
+
+    cat: function (args) {
+      var files = args.filter(function (a) { return a.charAt(0) !== "-"; });
+      if (!files.length) { append("cat: missing operand", "term-error"); return; }
+      files.forEach(function (fname) {
+        var node = getNode(resolveParts(fname));
+        if (!node) { append("cat: " + esc(fname) + ": No such file or directory", "term-error"); return; }
+        if (node.type === "dir") { append("cat: " + esc(fname) + ": Is a directory", "term-error"); return; }
+        append("<pre>" + esc(node.content) + "</pre>");
+      });
+    },
+
+    clear: function () { outputEl.innerHTML = ""; },
+    neofetch: function () { renderNeofetch(); },
+    links: function () { renderLinks(); }
+  };
+
+  var cmdHistory = [];
   var histIdx = 0;
 
-  function runLine(val) {
-    echoCommand(val);
-    if (val === "") return;
-    history.push(val);
-    histIdx = history.length;
-    if (val === "clear") { outputEl.innerHTML = ""; return; }
-    if (val === "neofetch") { renderNeofetch(); return; }
-    var out = feedWasm(val);
-    if (wasm && wasm.fg_raw && wasm.fg_raw() === 1) {
-      enterScreenMode();
-      applyVT(out);
-      renderScreen();
-    } else {
-      appendText(out);
-      updatePrompt();
-    }
+  function runCommand(raw) {
+    var cmd = raw.trim();
+    if (!cmd) return;
+    cmdHistory.push(cmd);
+    histIdx = cmdHistory.length;
+    var tokens = cmd.split(/\s+/);
+    var name = tokens[0];
+    var fn = COMMANDS[name];
+    if (fn) fn(tokens.slice(1));
+    else append("bash: " + esc(name) + ": command not found", "term-error");
   }
 
+  /* ---------------------------------------------------------------- input */
+
   function showPrompt() {
+    updatePrompt();
     inputLine.style.display = "flex";
     input.focus();
     scrollBottom();
   }
 
   function wireInput() {
-    document.addEventListener("keydown", function (e) {
-      if (!screenMode) return;
-      var bytes = keyBytes(e);
-      if (bytes) { e.preventDefault(); feedRaw(bytes); }
-    });
     input.addEventListener("keydown", function (e) {
-      if (screenMode) return;
       if (e.key === "Enter") {
-        var v = input.value;
+        var val = input.value;
         input.value = "";
-        runLine(v.trim());
+        echoCommand(val);
+        runCommand(val);
+        updatePrompt();
         scrollBottom();
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        if (history.length) { histIdx = Math.max(0, histIdx - 1); input.value = history[histIdx] || ""; }
+        if (cmdHistory.length) {
+          histIdx = Math.max(0, histIdx - 1);
+          input.value = cmdHistory[histIdx] || "";
+          setCaretEnd();
+        }
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
-        if (histIdx < history.length) { histIdx++; input.value = history[histIdx] || ""; }
+        if (histIdx < cmdHistory.length) {
+          histIdx++;
+          input.value = cmdHistory[histIdx] || "";
+        }
       } else if (e.key === "l" && e.ctrlKey) {
         e.preventDefault();
         outputEl.innerHTML = "";
       }
     });
+
+    // Click anywhere in the terminal focuses the input, without stealing link
+    // clicks or interrupting text selection.
     screenEl.addEventListener("click", function (e) {
       if (booting) return;
       if (e.target.closest("a")) return;
@@ -274,19 +366,13 @@
     });
   }
 
-  /* ----------------------------------------------- maximize (green dot) */
-  function wireMaximize() {
-    if (!greenDot || !terminalEl) return;
-    greenDot.style.cursor = "pointer";
-    greenDot.setAttribute("title", "maximize / restore");
-    greenDot.addEventListener("click", function () {
-      terminalEl.classList.toggle("maximized");
-      scrollBottom();
-      if (input) input.focus();
-    });
+  function setCaretEnd() {
+    var v = input.value;
+    requestAnimationFrame(function () { input.setSelectionRange(v.length, v.length); });
   }
 
-  /* -------------------------------------------------------- boot anim */
+  /* -------------------------------------------------------- boot sequence */
+
   var booting = true;
   var skipped = false;
   var sleepers = [];
@@ -300,31 +386,37 @@
       sleepers.push({ id: id, resolve: resolve });
     });
   }
+
   function flushSleeps() {
     sleepers.forEach(function (s) { clearTimeout(s.id); s.resolve(); });
     sleepers = [];
   }
+
   function finishBoot() {
     outputEl.innerHTML = "";
     echoCommand("neofetch"); renderNeofetch();
+    echoCommand("links"); renderLinks();
     booting = false;
     document.removeEventListener("click", skipBoot, true);
     showPrompt();
   }
+
   function skipBoot() {
     if (!booting || skipped) return;
     skipped = true;
     flushSleeps();
     finishBoot();
   }
+
   function animateCommand(cmd) {
     var line = document.createElement("p");
     line.className = "line";
-    line.innerHTML = '<span class="prompt">' + esc(PROMPT) + '</span> <span class="typed"></span><span class="type-cursor"></span>';
+    line.innerHTML = '<span class="prompt">' + esc(promptStr()) + '</span> <span class="typed"></span><span class="type-cursor"></span>';
     outputEl.appendChild(line);
     var typed = line.querySelector(".typed");
     var cursor = line.querySelector(".type-cursor");
     var i = 0;
+
     function step() {
       if (skipped) return Promise.resolve();
       if (i >= cmd.length) {
@@ -337,10 +429,13 @@
     }
     return step();
   }
+
   function boot() {
     document.addEventListener("click", skipBoot, true);
     animateCommand("neofetch")
       .then(function () { if (skipped) return; renderNeofetch(); return sleep(160); })
+      .then(function () { if (skipped) return; return animateCommand("links"); })
+      .then(function () { if (skipped) return; renderLinks(); return sleep(120); })
       .then(function () {
         if (skipped) return;
         booting = false;
@@ -349,34 +444,16 @@
       });
   }
 
-  /* -------------------------------------------------------------- init */
+  /* ------------------------------------------------------------------ init */
+
   buildDom();
   wireInput();
-  wireMaximize();
-
-  // load the TonicBoxOS image (desktop only); boot UI proceeds meanwhile
-  fetch("tbvm.wasm")
-    .then(function (r) { return r.arrayBuffer(); })
-    .then(function (buf) { return WebAssembly.instantiate(buf, {}); })
-    .then(function (res) {
-      wasm = res.instance.exports;
-      var seed = 1;
-      if (window.crypto && window.crypto.getRandomValues) {
-        var a = new Uint32Array(1);
-        window.crypto.getRandomValues(a);
-        seed = a[0] || 1;
-      } else {
-        seed = (Math.floor(Math.random() * 0xffffffff) >>> 0) || 1;
-      }
-      wasm.boot(seed); // per-session ASLR base + canary
-      wasm.run(30000000); // shell loads and blocks on stdin
-      updatePrompt();
-    })
-    .catch(function () { wasm = null; });
+  updatePrompt();
 
   if (reduceMotion) {
     booting = false;
     echoCommand("neofetch"); renderNeofetch();
+    echoCommand("links"); renderLinks();
     showPrompt();
   } else {
     boot();
