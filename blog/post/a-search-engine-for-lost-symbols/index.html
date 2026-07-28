@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>A Search Engine for Lost Symbols - TonicBox</title>
+  <meta name="description" content="Remapping obfuscated code across revisions by identity, not structure: A case study in distributional semantics.">
+  <link rel="canonical" href="https://blog.tonicbox.dev/post/a-search-engine-for-lost-symbols/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="TonicBox">
+  <meta property="og:title" content="A Search Engine for Lost Symbols">
+  <meta property="og:description" content="Remapping obfuscated code across revisions by identity, not structure: A case study in distributional semantics.">
+  <meta property="og:url" content="https://blog.tonicbox.dev/post/a-search-engine-for-lost-symbols/">
+  <meta property="article:published_time" content="2026-07-28T12:00:00Z">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:site" content="@Tonic_Box">
+  <link rel="stylesheet" href="../../style.css?v=4">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230b0e14'/><text x='2' y='12' font-family='monospace' font-size='11' fill='%237aa2f7'>&gt;_</text></svg>">
+  <script>(function(){var s=document.createElement("script");var h=location.hostname;s.src=(h==="localhost"||h==="127.0.0.1"?"":"https://tonicbox.dev")+"/nav.js?v=22";s.defer=true;document.head.appendChild(s);})();</script>
+</head>
+<body>
+  <article>
+    <header class="post-head">
+      <nav class="links">
+        <a href="../../">&larr; ~/blog</a>
+      </nav>
+      <h1>A Search Engine for Lost Symbols</h1>
+      <p class="meta">2026-07-28 &middot; TonicBox</p>
+    </header>
+
+    <div class="post-body">
+      <p>I was having a conversation the other day with a friend about an old Java game we've both done work on. And the topic of remapping came up. I was reminded of the approach I took for my remapper back then. My approach was a bit unorthodox, but worked extremely well. So I felt it was a good topic for another blog post.</p>
+
+      <h2>Remapping?</h2>
+
+      <p>Remapping in this context refers to a system that takes mappings of an obfuscated program (definitions of what is where), and remaps those definitions to a new version with fresh obfuscation applied to it. This can be challenging because names, locations, descriptors, and even structures <strong>can and usually do change</strong> here.</p>
+
+      <p>It's like getting a new seating chart after everyone changes seats, then figuring out who in the new chart corresponds to each person in the old one.</p>
+
+      <h2>How's it normally solved?</h2>
+
+      <p>Normally, for remapping, the process looks like this:</p>
+
+      <ol class="steps">
+        <li><strong>Normalize Code</strong> - Reduce noise, eliminate dead code, untangle obfuscated control flow.</li>
+        <li><strong>Extract Features</strong> - Collect identifying information from each class, method, and field.</li>
+        <li><strong>Build <a class="ref" href="https://en.wikipedia.org/wiki/Dependency_graph" target="_blank" rel="noopener">Dependency Graphs</a></strong> - Classes, methods, and fields become nodes; calls, field access, inheritance, and ownership become edges.</li>
+        <li><strong>Score and Match</strong> - Rank possible matches, reject conflicts, and choose the most consistent mapping across the graph.</li>
+      </ol>
+
+      <p>Algorithms and specifics may vary, but <strong>the graph model is the constant</strong>. Which means <strong>structure still acts as the primary anchor for identity</strong>, even when other features are considered.</p>
+
+      <h2>Structure Is Not Identity</h2>
+
+      <p>The main issue with this path is that <strong>structure is never guaranteed</strong> across re-obfuscation of new revisions. Especially once you consider static shuffling, code inlining/extraction, or actual code base changes and refactors. Once these get introduced into the mix, then issues present themselves and all of a sudden the well-trodden approach isn't so reliable.</p>
+
+      <p>But then, what should you chase to resolve where stuff lives across revisions in a program? This is what I asked myself, and the answer is <code>Identity</code>.</p>
+
+      <p>Identity is the answer to "what does this element (class/method/field) do? What does it represent? What functionality does it provide or feed?". If you could define an element's identity <strong>without coupling it to structural graphing</strong>, that would be far more valuable.</p>
+
+      <h2>The Missing Signal</h2>
+
+      <p>In order to answer this, I first had to think about what identity actually meant. Like, as a reverse engineer, I can look into a new binary and understand "Oh this field feeds this method which does x, y, or z", or "this method takes in these fields always and is called from this place.." and understand agnostically of the structure, what it is. So what is the actual logic behind that manual lens?</p>
+
+      <p>Well, it's a focus on <span class="term">context</span>:</p>
+
+      <ul>
+        <li>What surrounds it?</li>
+        <li>What feeds it?</li>
+        <li>What does it feed?</li>
+      </ul>
+
+      <p>This is the signal I was looking for. After some research and reading, I learned this is exactly what the field of <a class="ref" href="https://en.wikipedia.org/wiki/Distributional_semantics" target="_blank" rel="noopener">distributional semantics</a> aims to capture. It's the idea that:<br /><code>"You shall know a word by the company it keeps"</code> <small> - <i>J.R. Firth</i></small></p>
+	  
+	  <p>Swap <strong>"word"</strong> for <strong>"symbol"</strong> and that's the whole idea.</p>
+
+      <h2>Quantifying Context</h2>
+
+      <p>The next problem was turning that context into something measurable.</p>
+
+      <p>This is where <a class="ref" href="https://en.wikipedia.org/wiki/Tf%E2%80%93idf" target="_blank" rel="noopener">TF-IDF</a> came in. TF-IDF stands for <strong>Term Frequency&ndash;Inverse Document Frequency</strong>, and is normally used to measure how characteristic a word is to one document compared to an entire collection.</p>
+	  
+	  <p>It's the classic backbone of search ranking, and the shape of the problem here is the same: each old element is a query, every element in the new revision is a document, and what you want back is a ranked list of which one it most resembles.</p>
+	  
+      <p>Applied here:</p>
+
+      <ul>
+        <li>The element becomes the document</li>
+        <li>Its surrounding references become the terms</li>
+        <li>Frequently seen local relationships gain weight</li>
+        <li>Relationships common across the whole program lose weight</li>
+        <li>Rare, distinctive relationships gain more weight</li>
+      </ul>
+
+      <p>Both revisions are treated as a <strong>single corpus</strong>. IDF is computed across the union, so a term is weighted consistently in both revisions rather than producing two unrelated rankings. Nothing outside the two revisions is used; there's no external corpus or training set.</p>
+
+      <p>Once each element was represented by its weighted context, I could compare the old and new revisions by <strong>vector similarity</strong> and score how likely two elements were to share the same identity.</p>
+
+      <figure class="graph fill">
+        <img src="similarity_matrix_mock.svg" alt="A grid of cosine similarity scores between six old-revision elements and seven new-revision elements.">
+        <figcaption>Round one scores. Two pairs stand far enough above every alternative to be promoted; the rest stay ambiguous, two rows contend for the same column, and one element has no strong match at all.</figcaption>
+      </figure>
+
+      <p>Thus, a new approach is born: the <span class="term">Identity Graph</span>.</p>
+
+	  <p>It's still a graph, but not a structural one - the nodes are elements from both revisions, and the edges are scored candidate correspondences between them, not calls or field accesses. The program's shape isn't encoded in it at all.</p>
+
+      <h2>Identity Propagates</h2>
+
+      <p>The important part here was that these scores weren't calculated once and treated as final. The graph was <strong>refined iteratively</strong>.</p>
+
+      <p>Initially, each element only had the context directly available around it. Most come out ambiguous at that stage. A few don't: where one candidate scores far enough above every alternative and no other element wants that same partner, the pair is promoted to a <span class="term">resolved identity</span>.</p>
+
+      <p>Promotion is what makes the next round different. A resolved identity becomes a term in its own right, so an element that previously had "read by some method" as context can now have "read by the resolved packet-parsing method". The vocabulary grows, weights are recomputed over the expanded corpus, and elements that were indistinguishable on round one separate on round two. Those resolve, become context themselves, and the process repeats <strong>until a round promotes nothing new</strong>.</p>
+
+      <figure class="graph wide">
+        <img src="identity-propagation.svg" alt="The same small context graph drawn across three refinement rounds.">
+        <figcaption>Identity propagates: each resolved pair becomes context that disambiguates the next round, until a round promotes nothing new.</figcaption>
+      </figure>
+
+      <p>This process was completely agnostic of the existing mappings. It resolved both revisions into a shared identity model based only on the code and the context surrounding each element.</p>
+
+      <p>Only once that shared model stabilized were the old mappings introduced. At that point, generating the new mappings was mostly just translation:</p>
+
+      <pre><code>old mapped symbol -&gt; resolved identity -&gt; corresponding element in the new revision</code></pre>
+
+      <h2>Conclusion</h2>
+
+      <p>In the end, this worked extremely well. It not only reliably <strong>survived re-obfuscation</strong>, but also <strong>large structural changes</strong> across revisions of the game.</p>
+
+      <p>The main advantage was that it wasn't trying to force one revision's structure onto another. It built a unified identity model across both revisions, then used the old mappings only at the very end to translate those identities into new symbols.</p>
+
+      <figure class="graph wide">
+        <img src="remap-pipeline.svg" alt="The pipeline as a left-to-right flow.">
+        <figcaption>The whole pipeline. Identity is resolved first over both revisions; the old mappings enter only at the very end, to translate.</figcaption>
+      </figure>
+
+      <p>I also think the same approach could have value well outside of this use case. Native applications with stripped symbols, firmware revisions, malware families, or binaries compiled with different toolchains all have the same general problem: structures are unstable, but <strong>the role something plays within the wider program is often far more consistent</strong>.</p>
+
+      <p>There is probably a lot of room here for applying distributional ideas to reverse engineering more generally. Rather than identifying code purely by what it looks like, identify it by <strong>the shadow it casts across everything around it</strong>.</p>
+    </div>
+
+    <footer>
+      <p><a href="../../">&larr; back to ~/blog</a></p>
+      <p class="copyright">&copy; 2026 TonicBox</p>
+    </footer>
+  </article>
+</body>
+</html>

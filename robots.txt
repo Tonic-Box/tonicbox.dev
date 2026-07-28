@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /blog/
+Disallow: /portfolio/
+Sitemap: https://tonicbox.dev/sitemap.xml

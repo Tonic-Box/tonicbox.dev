@@ -1,0 +1,37 @@
+// Identity propagation over refinement rounds: the same small context graph, drawn
+// three times; green = resolved identity, dim = still ambiguous. 2 -> 4 -> 5 (stable).
+digraph propagation {
+  bgcolor="transparent";
+  node [shape=box, style="rounded,filled", fontname="monospace", fontsize=10,
+        fillcolor="#0d111a", color="#2a3554", fontcolor="#565f89", penwidth=1.3, margin="0.14,0.07"];
+  edge [color="#2a3554", penwidth=1.0, arrowsize=0.6];
+  graph [fontname="monospace", fontsize=10];
+
+  subgraph cluster_r1 {
+    label="round 1"; labelloc=t; color="#3a4266"; style=dashed; fontcolor="#7aa2f7";
+    a1 [label="parse", fillcolor="#10231a", color="#9ece6a", fontcolor="#e6ebff"];
+    b1 [label="buf",   fillcolor="#10231a", color="#9ece6a", fontcolor="#e6ebff"];
+    c1 [label="read"]; d1 [label="emit"]; e1 [label="hdr"];
+    b1 -> a1; e1 -> a1; c1 -> a1; a1 -> d1; b1 -> c1;
+  }
+  subgraph cluster_r2 {
+    label="round 2"; labelloc=t; color="#3a4266"; style=dashed; fontcolor="#7aa2f7";
+    a2 [label="parse", fillcolor="#10231a", color="#9ece6a", fontcolor="#e6ebff"];
+    b2 [label="buf",   fillcolor="#10231a", color="#9ece6a", fontcolor="#e6ebff"];
+    c2 [label="read",  fillcolor="#10231a", color="#9ece6a", fontcolor="#e6ebff"];
+    d2 [label="emit",  fillcolor="#10231a", color="#9ece6a", fontcolor="#e6ebff"];
+    e2 [label="hdr"];
+    b2 -> a2; e2 -> a2; c2 -> a2; a2 -> d2; b2 -> c2;
+  }
+  subgraph cluster_r3 {
+    label="round 3 · stable"; labelloc=t; color="#9ece6a"; style=dashed; fontcolor="#9ece6a";
+    a3 [label="parse", fillcolor="#10231a", color="#9ece6a", fontcolor="#e6ebff"];
+    b3 [label="buf",   fillcolor="#10231a", color="#9ece6a", fontcolor="#e6ebff"];
+    c3 [label="read",  fillcolor="#10231a", color="#9ece6a", fontcolor="#e6ebff"];
+    d3 [label="emit",  fillcolor="#10231a", color="#9ece6a", fontcolor="#e6ebff"];
+    e3 [label="hdr",   fillcolor="#10231a", color="#9ece6a", fontcolor="#e6ebff"];
+    b3 -> a3; e3 -> a3; c3 -> a3; a3 -> d3; b3 -> c3;
+  }
+  // stagger the rounds as a shallow top-left -> bottom-right staircase (invisible constraint)
+  b1 -> b2 [style=invis]; b2 -> b3 [style=invis];
+}

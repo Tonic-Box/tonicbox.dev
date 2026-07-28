@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>tbdbg - the TonicBoxOS debugger</title>
+<meta name="description" content="A concise reference for tbdbg and strace, the debugger and syscall tracer built into TonicBoxOS: breakpoints, single-step, registers, memory, disassembly, backtraces, and syscall tracing.">
+<link rel="canonical" href="https://tonicbox.dev/tbdbg.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230b0e14'/><text x='2' y='12' font-family='monospace' font-size='11' fill='%237aa2f7'>&gt;_</text></svg>">
+<link rel="stylesheet" href="docs.css?v=1">
+<style>
+  html { scroll-behavior: smooth; }
+
+  .wrap { max-width: 860px; margin: 0 auto; }
+
+  header.hero { margin-bottom: 2.5rem; }
+
+  h1 .accent { color: var(--green); }
+
+  .lede { color: var(--dim); font-size: 15px; max-width: 64ch; }
+
+  .meta { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.1rem; }
+
+  .chip {
+      font-size: 12px; color: var(--muted);
+      border: 1px solid var(--border); border-radius: 999px;
+      padding: 0.2rem 0.7rem; background: var(--panel-2);
+    }
+
+  .chip b { color: var(--dim); font-weight: 600; }
+
+  nav.toc {
+      display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem;
+      padding: 0.9rem 1.1rem; margin-bottom: 2.5rem;
+      background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+      font-size: 13px;
+    }
+
+  nav.toc a { color: var(--dim); text-decoration: none; }
+
+  nav.toc a:hover { color: var(--green); }
+
+  nav.toc span { color: var(--border); }
+
+  section { margin-bottom: 2.6rem; scroll-margin-top: 1rem; }
+
+  h2 {
+      font-size: 1.25rem; color: #dbe3ff; font-weight: 600;
+      margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);
+    }
+
+  h2 .n { color: var(--muted); font-weight: 400; margin-right: 0.6rem; font-size: 1rem; }
+
+  .survive {
+      background: rgba(158, 206, 106, 0.05);
+      border: 1px solid rgba(158, 206, 106, 0.22);
+      border-left: 2px solid var(--green);
+      border-radius: 8px; padding: 1.15rem 1.25rem; margin-bottom: 2.5rem;
+    }
+
+  .survive .label { color: var(--green); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; }
+
+  .survive dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1.1rem; margin-top: 0.7rem; }
+
+  .survive dt { color: var(--green); white-space: nowrap; }
+
+  .survive dt code { color: var(--green); background: none; border: none; padding: 0; }
+
+  .survive dd { color: var(--dim); }
+
+  table { width: 100%; border-collapse: collapse; margin: 0.3rem 0 0.4rem; font-size: 13.5px; }
+
+  th, td { text-align: left; padding: 0.45rem 0.7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  td.k { white-space: nowrap; }
+
+  td.k code { color: var(--green); }
+
+  td.desc { color: var(--dim); }
+
+  pre {
+      background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+      padding: 1rem 1.1rem; margin: 0.3rem 0 1rem; overflow-x: auto;
+      font-size: 13px; line-height: 1.6; color: var(--text);
+    }
+
+  pre .c { color: var(--muted); }
+
+  pre .p { color: var(--green); }
+
+  ul.list { list-style: none; margin: 0.2rem 0 1rem; }
+
+  ul.list li { position: relative; padding-left: 1.4rem; margin-bottom: 0.45rem; color: var(--dim); }
+
+  ul.list li::before { content: ""; position: absolute; left: 0.15rem; top: 0.66em; width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
+
+  ul.list li strong { color: var(--text); }
+
+  footer { margin-top: 3.2rem; padding-top: 1.4rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 12.5px; }
+
+  footer a:hover { color: var(--green); }
+
+  @media (max-width: 560px) {
+      body { font-size: 14px; }
+      h1 { font-size: 1.6rem; }
+      nav.toc span { display: none; }
+      .survive dl { grid-template-columns: 1fr; gap: 0.1rem 0; }
+      .survive dd { margin-bottom: 0.5rem; }
+    }
+</style>
+  <script>(function(){var s=document.createElement("script");var h=location.hostname;s.src=(h==="localhost"||h==="127.0.0.1"?"":"https://tonicbox.dev")+"/nav.js?v=22";s.defer=true;document.head.appendChild(s);})();</script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">TonicBoxOS &middot; debugger reference</div>
+    <h1><span class="accent">tbdbg</span> - the debugger</h1>
+    <p class="lede">
+      An interactive debugger for TB32 programs. It launches a program stopped at its entry point in a
+      traced, de-privileged child and offers breakpoints, single-step, register and memory inspection,
+      disassembly and backtraces. <code>strace</code> runs a program and prints every system call it makes.
+      Both run inside the interactive terminal.
+    </p>
+    <div class="meta">
+      <span class="chip"><b>open</b> tbdbg PROG</span>
+      <span class="chip"><b>break</b> by symbol or address</span>
+      <span class="chip"><b>trace</b> strace PROG</span>
+      <span class="chip"><b>ctf</b> setuid binaries blocked</span>
+    </div>
+  </header>
+
+  <div class="survive">
+    <div class="label">Survival kit</div>
+    <dl>
+      <dt><code>tbdbg ./prog</code></dt><dd>launch, stopped at entry</dd>
+      <dt><code>b main</code></dt><dd>breakpoint at a symbol</dd>
+      <dt><code>c</code></dt><dd>run to the breakpoint</dd>
+      <dt><code>regs</code></dt><dd>show the registers</dd>
+      <dt><code>s</code></dt><dd>step one instruction</dd>
+      <dt><code>q</code></dt><dd>quit the debugger</dd>
+    </dl>
+  </div>
+
+  <nav class="toc">
+    <a href="#launch">launching</a><span>/</span>
+    <a href="#break">breakpoints</a><span>/</span>
+    <a href="#run">running</a><span>/</span>
+    <a href="#inspect">inspecting</a><span>/</span>
+    <a href="#operands">operands</a><span>/</span>
+    <a href="#strace">strace</a><span>/</span>
+    <a href="#limits">limits</a>
+  </nav>
+
+  <section id="launch">
+    <h2><span class="n">00</span>Launching</h2>
+    <p>
+      <code>tbdbg PROG [args]</code> loads <code>PROG</code> into a separate, traced child and stops it at
+      the entry point (<code>_start</code>), then opens a <code>(tbdbg)</code> prompt. The child runs in its
+      own memory window and with <strong>your</strong> privileges - a debugged program can never gain more
+      than the user running it.
+    </p>
+    <pre><span class="p">(tbdbg)</span> b main
+breakpoint at 0x000291f8 &lt;main&gt;
+<span class="p">(tbdbg)</span> c
+breakpoint at 0x000291f8 &lt;main&gt;
+stopped at 0x000291f8 &lt;main&gt;</pre>
+    <p>
+      Symbols resolve through the program's own symbol table, and the per-session address randomization
+      (ASLR) slide is applied automatically, so <code>b main</code> lands at the real runtime address.
+    </p>
+  </section>
+
+  <section id="break">
+    <h2><span class="n">01</span>Breakpoints</h2>
+    <table>
+      <tr><th>Command</th><th>Effect</th></tr>
+      <tr><td class="k"><code>b ADDR</code> / <code>b SYM</code></td><td class="desc">set a breakpoint at an address or symbol</td></tr>
+      <tr><td class="k"><code>d ADDR</code> / <code>d SYM</code></td><td class="desc">delete a breakpoint</td></tr>
+    </table>
+    <p>Up to 16 breakpoints. Continuing from a breakpoint steps past it automatically.</p>
+  </section>
+
+  <section id="run">
+    <h2><span class="n">02</span>Running</h2>
+    <table>
+      <tr><th>Command</th><th>Effect</th></tr>
+      <tr><td class="k"><code>c</code></td><td class="desc">continue until a breakpoint, exit, or fault</td></tr>
+      <tr><td class="k"><code>s</code> / <code>si</code></td><td class="desc">step one instruction</td></tr>
+      <tr><td class="k"><code>n</code></td><td class="desc">step over a call (runs it to completion, then stops)</td></tr>
+      <tr><td class="k"><code>q</code></td><td class="desc">quit and end the traced program</td></tr>
+    </table>
+    <p>Commands also accept long forms: <code>cont</code>, <code>step</code>, <code>next</code>, <code>break</code>, <code>delete</code>, <code>quit</code>, <code>regs</code>.</p>
+    <p>
+      Each stop prints its reason and the current instruction. When the program ends, <code>tbdbg</code>
+      reports the exit status.
+    </p>
+  </section>
+
+  <section id="inspect">
+    <h2><span class="n">03</span>Inspecting</h2>
+    <table>
+      <tr><th>Command</th><th>Effect</th></tr>
+      <tr><td class="k"><code>regs</code> / <code>r</code></td><td class="desc">all 16 registers plus <code>pc</code> (r13 = sp, r14 = fp, r15 = lr)</td></tr>
+      <tr><td class="k"><code>x ADDR [N]</code></td><td class="desc">dump N words (default 8) from memory</td></tr>
+      <tr><td class="k"><code>set rN VAL</code></td><td class="desc">set a register</td></tr>
+      <tr><td class="k"><code>set pc VAL</code></td><td class="desc">set the program counter</td></tr>
+      <tr><td class="k"><code>set *ADDR VAL</code></td><td class="desc">write a word to memory</td></tr>
+      <tr><td class="k"><code>dis [ADDR]</code></td><td class="desc">disassemble 8 instructions (default at <code>pc</code>)</td></tr>
+      <tr><td class="k"><code>bt</code></td><td class="desc">backtrace (walks the frame-pointer chain)</td></tr>
+      <tr><td class="k"><code>info</code></td><td class="desc">current pc and run state</td></tr>
+    </table>
+  </section>
+
+  <section id="operands">
+    <h2><span class="n">04</span>Operands</h2>
+    <p>Anywhere an address or value is expected:</p>
+    <table>
+      <tr><th>Form</th><th>Means</th></tr>
+      <tr><td class="k"><code>0x1a2c</code></td><td class="desc">hexadecimal number</td></tr>
+      <tr><td class="k"><code>42</code></td><td class="desc">decimal number</td></tr>
+      <tr><td class="k"><code>main</code></td><td class="desc">a symbol's runtime address</td></tr>
+      <tr><td class="k"><code>$pc</code> <code>$sp</code> <code>$fp</code></td><td class="desc">the live pc / stack pointer / frame pointer</td></tr>
+      <tr><td class="k"><code>r0</code> ... <code>r15</code></td><td class="desc">a register's current value</td></tr>
+    </table>
+  </section>
+
+  <section id="strace">
+    <h2><span class="n">05</span>strace</h2>
+    <p>
+      <code>strace PROG [args]</code> runs a program and prints each system call it makes, with its
+      arguments and return value, ending with the exit status.
+    </p>
+    <pre><span class="c">$</span> strace ./prog
+write(1, 0x00029274, 12) = 12
+exit(0, 0, 0) = ?
++++ exited (status 0) +++</pre>
+  </section>
+
+  <section id="limits">
+    <h2><span class="n">06</span>Limits</h2>
+    <ul class="list">
+      <li><strong>Setuid binaries are off-limits.</strong> A non-root user cannot trace a setuid-root program (such as <code>guestbook</code>), the same rule Linux applies to <code>ptrace</code>. To study one, debug a non-setuid copy - it runs as you, so it never yields root.</li>
+      <li><strong>One process.</strong> A traced program that spawns a subprocess stops with a notice; the subprocess is not traced.</li>
+      <li><strong>No input injection.</strong> A traced program that blocks reading input stops with a notice and cannot be fed from the debugger.</li>
+      <li><strong>Addresses are slid.</strong> Everything shown includes the per-session ASLR slide; it changes each time the machine boots.</li>
+    </ul>
+  </section>
+
+  <footer>
+    tbdbg and strace ship in the TonicBoxOS userland, written in
+    <a href="tbc.html">TBC</a>. Part of <a href="https://tonicbox.dev">tonicbox.dev</a>.
+    <p class="copyright">&copy; 2026 TonicBox</p>
+  </footer>
+
+</div>
+</body>
+</html>

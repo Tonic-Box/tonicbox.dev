@@ -1,15 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
   <title>TonicBox/blog</title>
-  <subtitle>compilers, Java internals, tooling, and debugging war stories</subtitle>
+  <subtitle>Reverse engineering, compilers, and systems programming</subtitle>
   <link href="https://blog.tonicbox.dev/feed.xml" rel="self"/>
   <link href="https://blog.tonicbox.dev/" rel="alternate"/>
   <id>https://blog.tonicbox.dev/</id>
-  <updated>2026-07-21T12:00:00Z</updated>
+  <updated>2026-07-28T12:00:00Z</updated>
   <author>
     <name>TonicBox</name>
     <uri>https://tonicbox.dev</uri>
   </author>
+
+  <entry>
+    <title>A Search Engine for Lost Symbols</title>
+    <link href="https://blog.tonicbox.dev/post/a-search-engine-for-lost-symbols/" rel="alternate"/>
+    <id>https://blog.tonicbox.dev/post/a-search-engine-for-lost-symbols/</id>
+    <published>2026-07-28T12:00:00Z</published>
+    <updated>2026-07-28T12:00:00Z</updated>
+    <summary>Remapping obfuscated code across revisions by identity, not structure: A case study in distributional semantics.</summary>
+  </entry>
 
   <entry>
     <title>RBP, and only RBP: losing a register to SEH</title>

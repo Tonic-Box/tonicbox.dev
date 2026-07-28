@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>as - the TB32 assembler & instruction set - TonicBoxOS</title>
+<meta name="description" content="The TB32 instruction set and assembler for TonicBoxOS: registers, the four encoding formats, every instruction with its opcode and semantics, the flag model, pseudo-instructions, and assembler syntax. What objdump, tbdbg, and as speak.">
+<link rel="canonical" href="https://tonicbox.dev/as.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230b0e14'/><text x='2' y='12' font-family='monospace' font-size='11' fill='%237aa2f7'>&gt;_</text></svg>">
+<link rel="stylesheet" href="docs.css?v=1">
+<style>
+  html { scroll-behavior: smooth; }
+
+  .wrap { max-width: 900px; margin: 0 auto; }
+
+  header.hero { margin-bottom: 2.5rem; }
+
+  h1 .accent { color: var(--cyan); }
+
+  .lede { color: var(--dim); font-size: 15px; max-width: 68ch; }
+
+  .conv {
+      margin-top: 1.2rem; padding: 0.9rem 1.1rem;
+      background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--dim); font-size: 13px;
+    }
+
+  .conv code { color: var(--cyan); }
+
+  .conv strong { color: var(--text); }
+
+  nav.toc {
+      display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem;
+      padding: 0.9rem 1.1rem; margin: 1.6rem 0 2.5rem;
+      background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+      font-size: 13px;
+    }
+
+  nav.toc a { color: var(--dim); text-decoration: none; }
+
+  nav.toc a:hover { color: var(--cyan); }
+
+  nav.toc span { color: var(--border); }
+
+  section { margin-bottom: 2.6rem; scroll-margin-top: 1rem; }
+
+  h2 {
+      font-size: 1.25rem; color: #dbe3ff; font-weight: 600;
+      margin-bottom: 0.9rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);
+    }
+
+  h2 .n { color: var(--muted); font-weight: 400; margin-right: 0.6rem; font-size: 1rem; }
+
+  section p { color: var(--dim); }
+
+  section a, .lede a, .conv a { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
+
+  section a:hover, .lede a:hover, .conv a:hover { color: var(--cyan); }
+
+  table { width: 100%; border-collapse: collapse; margin: 0.3rem 0 0.4rem; font-size: 13px; }
+
+  th, td { text-align: left; padding: 0.45rem 0.7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+
+  th { color: var(--muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  td.op { white-space: nowrap; }
+
+  td.op code { color: var(--green); background: none; border: none; padding: 0; font-size: 1em; }
+
+  td.num { white-space: nowrap; color: var(--muted); text-align: right; width: 3rem; }
+
+  td.d { color: var(--dim); }
+
+  td.d code, td.a code { color: var(--cyan); }
+
+  td.a { white-space: nowrap; color: var(--text); }
+
+  pre {
+      background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+      padding: 0.9rem 1.1rem; margin: 0.4rem 0 1rem; overflow-x: auto;
+      font-size: 13px; line-height: 1.6; color: var(--text);
+    }
+
+  pre .c { color: var(--muted); }
+
+  .f-op { color: var(--cyan); }
+  .f-rd { color: var(--green); }
+  .f-rs { color: var(--yellow); }
+  .f-im { color: var(--purple); }
+
+  ul.list { list-style: none; margin: 0.2rem 0 1rem; }
+  ul.list li { position: relative; padding-left: 1.4rem; margin-bottom: 0.45rem; color: var(--dim); }
+  ul.list li::before { content: ""; position: absolute; left: 0.15rem; top: 0.66em; width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
+  ul.list li strong { color: var(--text); }
+
+  footer { margin-top: 3.2rem; padding-top: 1.4rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 12.5px; }
+
+  footer a:hover { color: var(--cyan); }
+
+  @media (max-width: 640px) {
+      body { font-size: 14px; }
+      h1 { font-size: 1.6rem; }
+      nav.toc span { display: none; }
+      td.op, td.a, td.num { white-space: normal; }
+    }
+</style>
+  <script>(function(){var s=document.createElement("script");var h=location.hostname;s.src=(h==="localhost"||h==="127.0.0.1"?"":"https://tonicbox.dev")+"/nav.js?v=22";s.defer=true;document.head.appendChild(s);})();</script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">TonicBoxOS &middot; TB32 reference</div>
+    <h1><span class="accent">as</span> - the TB32 assembler</h1>
+    <p class="lede">
+      TB32 is the CPU underneath everything: a small, fixed-width 32-bit RISC. This is its instruction set -
+      what <code>objdump</code> and <a href="/tbdbg.html">tbdbg</a> disassemble, what <code>cc</code> emits, and
+      what <code>as</code> turns into a runnable object. Around 50 instructions in four encoding formats.
+    </p>
+    <div class="conv">
+      <strong>At a glance.</strong> Fixed <strong>32-bit</strong> instructions, little-endian. Sixteen registers
+      <code>r0</code>-<code>r15</code>; <code>r0</code> is hard-wired to zero. Loads/stores go through a flat
+      2&nbsp;MiB window. Comparisons set flags; conditional branches read them. The <code>sys</code> instruction
+      is the only door to the <a href="/syscalls.html">kernel</a>.
+    </div>
+  </header>
+
+  <nav class="toc">
+    <a href="#registers">registers</a><span>/</span>
+    <a href="#encoding">encoding</a><span>/</span>
+    <a href="#alu">arithmetic &amp; logic</a><span>/</span>
+    <a href="#mem">loads &amp; stores</a><span>/</span>
+    <a href="#flow">flow &amp; conditions</a><span>/</span>
+    <a href="#system">system &amp; faults</a><span>/</span>
+    <a href="#pseudo">pseudo-instructions</a><span>/</span>
+    <a href="#asm">assembler syntax</a>
+  </nav>
+
+  <section id="registers">
+    <h2><span class="n">00</span>Registers</h2>
+    <p>Sixteen 32-bit registers plus the program counter. Any register can be named <code>r0</code>-<code>r15</code>;
+      a few carry ABI roles and have aliases.</p>
+    <table>
+      <tr><th>reg</th><th>alias</th><th>role</th></tr>
+      <tr><td class="op"><code>r0</code></td><td class="a"><code>zero</code></td><td class="d">Hard-wired zero - reads as 0, writes are discarded. This is why <code>mov</code>/<code>nop</code> exist as they do.</td></tr>
+      <tr><td class="op"><code>r1</code>-<code>r6</code></td><td class="a"></td><td class="d">Argument / return registers. A call passes its arguments here and returns its result in <code>r1</code>.</td></tr>
+      <tr><td class="op"><code>r7</code></td><td class="a"></td><td class="d">By convention holds the syscall number for the <code>sys</code> instruction.</td></tr>
+      <tr><td class="op"><code>r8</code>-<code>r12</code></td><td class="a"></td><td class="d">General purpose.</td></tr>
+      <tr><td class="op"><code>r13</code></td><td class="a"><code>sp</code></td><td class="d">Stack pointer. The stack grows downward; <code>push</code>/<code>pop</code> adjust it by 4.</td></tr>
+      <tr><td class="op"><code>r14</code></td><td class="a"><code>fp</code></td><td class="d">Frame pointer.</td></tr>
+      <tr><td class="op"><code>r15</code></td><td class="a"><code>lr</code></td><td class="d">Link register. <code>call</code>/<code>callr</code> write the return address here; <code>ret</code> jumps to it.</td></tr>
+      <tr><td class="op"><code>pc</code></td><td class="a"></td><td class="d">Program counter (not part of the register file). Advances by 4 each instruction unless a branch redirects it.</td></tr>
+    </table>
+  </section>
+
+  <section id="encoding">
+    <h2><span class="n">01</span>Encoding</h2>
+    <p>Every instruction is one 32-bit word. The top 7 bits are the opcode; the rest is one of four field layouts.
+      Register fields are 4 bits (0-15).</p>
+    <table>
+      <tr><th>form</th><th>31:25</th><th>24:21</th><th>20:17</th><th>16:0</th></tr>
+      <tr><td class="op">R</td><td><span class="f-op">opcode</span></td><td><span class="f-rd">rd</span></td><td><span class="f-rs">rs1</span></td><td><span class="f-rs">rs2</span> <span style="color:var(--muted)">[16:13]</span></td></tr>
+      <tr><td class="op">I</td><td><span class="f-op">opcode</span></td><td><span class="f-rd">rd</span></td><td><span class="f-rs">rs1</span></td><td><span class="f-im">imm16</span> <span style="color:var(--muted)">[16:1]</span></td></tr>
+      <tr><td class="op">J</td><td><span class="f-op">opcode</span></td><td colspan="3"><span class="f-im">imm25</span> <span style="color:var(--muted)">[24:0]</span></td></tr>
+      <tr><td class="op">REG</td><td><span class="f-op">opcode</span></td><td style="color:var(--muted)">-</td><td><span class="f-rs">rs1</span></td><td style="color:var(--muted)">-</td></tr>
+    </table>
+    <p>Loads, stores, and all immediate ops use the <strong>I</strong> form. <code>ret</code>/<code>sys</code>/<code>hlt</code>/<code>brk</code>
+      are opcode-only (every other field zero). A couple of details worth knowing when you read disassembly:</p>
+    <ul class="list">
+      <li><strong>Immediate extension.</strong> <code>addi</code>, <code>slti</code>, <code>sltiu</code>, <code>cmpi</code> and every load/store offset <strong>sign-extend</strong> the 16-bit immediate; <code>andi</code>, <code>ori</code>, <code>xori</code> <strong>zero-extend</strong> it.</li>
+      <li><strong>Branch offsets are relative and scaled.</strong> The 25-bit immediate is sign-extended, multiplied by 4, and added to the branch's <em>own</em> address. Targets are word-aligned.</li>
+      <li><strong><code>lui</code> loads the high half:</strong> <code>rd = imm16 &lt;&lt; 16</code>. A full 32-bit constant is <code>lui</code> + <code>ori</code> (see <code>li</code> below).</li>
+    </ul>
+  </section>
+
+  <section id="alu">
+    <h2><span class="n">02</span>Arithmetic &amp; logic</h2>
+    <p><strong>Register form</strong> (<code>R</code>): <code>op rd, rs1, rs2</code> computes <code>rd = rs1 op rs2</code>. Arithmetic wraps mod 2<sup>32</sup>.</p>
+    <table>
+      <tr><th>op</th><th>form</th><th>effect</th><th>enc</th></tr>
+      <tr><td class="op"><code>add sub</code></td><td class="a">rd, rs1, rs2</td><td class="d">add / subtract</td><td class="num">10 11</td></tr>
+      <tr><td class="op"><code>and or xor</code></td><td class="a">rd, rs1, rs2</td><td class="d">bitwise</td><td class="num">12-14</td></tr>
+      <tr><td class="op"><code>sll srl sra</code></td><td class="a">rd, rs1, rs2</td><td class="d">shift left / right-logical / right-arithmetic by <code>rs2 &amp; 31</code></td><td class="num">15-17</td></tr>
+      <tr><td class="op"><code>slt sltu</code></td><td class="a">rd, rs1, rs2</td><td class="d">set <code>rd = 1</code> if <code>rs1 &lt; rs2</code> (signed / unsigned), else 0</td><td class="num">18 19</td></tr>
+      <tr><td class="op"><code>mul</code></td><td class="a">rd, rs1, rs2</td><td class="d">low 32 bits of the product</td><td class="num">1A</td></tr>
+      <tr><td class="op"><code>div rem</code></td><td class="a">rd, rs1, rs2</td><td class="d">signed quotient / remainder (divide by zero faults)</td><td class="num">1F 2B</td></tr>
+      <tr><td class="op"><code>divu remu</code></td><td class="a">rd, rs1, rs2</td><td class="d">unsigned quotient / remainder (divide by zero faults)</td><td class="num">1B 1C</td></tr>
+      <tr><td class="op"><code>cmp</code></td><td class="a">rs1, rs2</td><td class="d">set flags from <code>rs1 - rs2</code> (no register written)</td><td class="num">1D</td></tr>
+      <tr><td class="op"><code>tst</code></td><td class="a">rs1, rs2</td><td class="d">set Z/N from <code>rs1 &amp; rs2</code> (no register written)</td><td class="num">1E</td></tr>
+    </table>
+    <p><strong>Immediate form</strong> (<code>I</code>): <code>op rd, rs1, imm</code> computes <code>rd = rs1 op imm16</code>.</p>
+    <table>
+      <tr><th>op</th><th>form</th><th>effect</th><th>enc</th></tr>
+      <tr><td class="op"><code>addi</code></td><td class="a">rd, rs1, imm</td><td class="d">add sign-extended immediate</td><td class="num">20</td></tr>
+      <tr><td class="op"><code>andi ori xori</code></td><td class="a">rd, rs1, imm</td><td class="d">bitwise with zero-extended immediate</td><td class="num">21-23</td></tr>
+      <tr><td class="op"><code>slli srli srai</code></td><td class="a">rd, rs1, imm</td><td class="d">shift by <code>imm &amp; 31</code></td><td class="num">24-26</td></tr>
+      <tr><td class="op"><code>slti sltiu</code></td><td class="a">rd, rs1, imm</td><td class="d">set-less-than against the sign-extended immediate (signed / unsigned compare)</td><td class="num">27 28</td></tr>
+      <tr><td class="op"><code>lui</code></td><td class="a">rd, imm</td><td class="d"><code>rd = imm16 &lt;&lt; 16</code></td><td class="num">29</td></tr>
+      <tr><td class="op"><code>cmpi</code></td><td class="a">rs1, imm</td><td class="d">set flags from <code>rs1 - </code>sign-extended immediate</td><td class="num">2A</td></tr>
+    </table>
+  </section>
+
+  <section id="mem">
+    <h2><span class="n">03</span>Loads &amp; stores</h2>
+    <p>Address is <code>rs1 + </code>the sign-extended offset, written <code>[base, offset]</code> (the offset is optional).
+      Loads read into <code>rd</code>; stores write <code>rd</code> out.</p>
+    <table>
+      <tr><th>op</th><th>form</th><th>effect</th><th>enc</th></tr>
+      <tr><td class="op"><code>lb lbu</code></td><td class="a">rd, [rs1, imm]</td><td class="d">load byte, sign- / zero-extended</td><td class="num">30 31</td></tr>
+      <tr><td class="op"><code>lh lhu</code></td><td class="a">rd, [rs1, imm]</td><td class="d">load halfword, sign- / zero-extended</td><td class="num">32 33</td></tr>
+      <tr><td class="op"><code>lw</code></td><td class="a">rd, [rs1, imm]</td><td class="d">load word</td><td class="num">34</td></tr>
+      <tr><td class="op"><code>sb sh sw</code></td><td class="a">rd, [rs1, imm]</td><td class="d">store low byte / halfword / word of <code>rd</code></td><td class="num">38-3A</td></tr>
+    </table>
+    <pre><span class="c">; load, add, store back</span>
+lw   r1, [sp, 8]
+addi r1, r1, 1
+sw   r1, [sp, 8]</pre>
+  </section>
+
+  <section id="flow">
+    <h2><span class="n">04</span>Flow &amp; conditions</h2>
+    <p>TB32 branches on <strong>flags</strong>, ARM-style. A <code>cmp</code>/<code>cmpi</code> sets all four; a
+      <code>tst</code> sets Z and N. A conditional branch then tests them - the branch itself carries no operands
+      but the PC-relative target.</p>
+    <table>
+      <tr><th>flag</th><th>meaning after <code>cmp a, b</code></th></tr>
+      <tr><td class="op">Z</td><td class="d">set when <code>a == b</code></td></tr>
+      <tr><td class="op">N</td><td class="d">sign bit of <code>a - b</code></td></tr>
+      <tr><td class="op">C</td><td class="d">set when <code>a &gt;= b</code> unsigned (no borrow)</td></tr>
+      <tr><td class="op">V</td><td class="d">signed overflow of <code>a - b</code></td></tr>
+    </table>
+    <table>
+      <tr><th>op</th><th>form</th><th>taken when</th><th>enc</th></tr>
+      <tr><td class="op"><code>bra</code></td><td class="a">label</td><td class="d">always (unconditional)</td><td class="num">40</td></tr>
+      <tr><td class="op"><code>beq bne</code></td><td class="a">label</td><td class="d">equal / not equal (Z / !Z)</td><td class="num">41 42</td></tr>
+      <tr><td class="op"><code>blt bge</code></td><td class="a">label</td><td class="d">signed &lt; / &gt;= (N&ne;V / N=V)</td><td class="num">43 44</td></tr>
+      <tr><td class="op"><code>bltu bgeu</code></td><td class="a">label</td><td class="d">unsigned &lt; / &gt;= (!C / C)</td><td class="num">45 46</td></tr>
+      <tr><td class="op"><code>call</code></td><td class="a">label</td><td class="d">set <code>lr</code> to the next instruction, then branch (PC-relative)</td><td class="num">48</td></tr>
+      <tr><td class="op"><code>callr</code></td><td class="a">rs1</td><td class="d">set <code>lr</code>, then jump to the address in <code>rs1</code></td><td class="num">49</td></tr>
+      <tr><td class="op"><code>jmp</code></td><td class="a">rs1</td><td class="d">jump to the address in <code>rs1</code> (no link)</td><td class="num">4B</td></tr>
+      <tr><td class="op"><code>ret</code></td><td class="a"></td><td class="d">jump to <code>lr</code></td><td class="num">4A</td></tr>
+    </table>
+    <p>Because <code>ret</code> just jumps to whatever is in <code>lr</code>, a routine that spills <code>lr</code> to
+      the stack and later reloads it is where control flow can be hijacked - the basis of the ROP path in the
+      <a href="/ctf.html">challenge</a>.</p>
+  </section>
+
+  <section id="system">
+    <h2><span class="n">05</span>System &amp; faults</h2>
+    <table>
+      <tr><th>op</th><th>effect</th><th>enc</th></tr>
+      <tr><td class="op"><code>sys</code></td><td class="d">system call. Number in <code>r7</code>, arguments in <code>r1</code>-<code>r6</code>, result in <code>r1</code>. See the <a href="/syscalls.html">syscall reference</a>.</td><td class="num">50</td></tr>
+      <tr><td class="op"><code>hlt</code></td><td class="d">halt the machine.</td><td class="num">51</td></tr>
+      <tr><td class="op"><code>brk</code></td><td class="d">breakpoint. A no-op during normal execution; the debugger patches instructions to <code>brk</code> to stop the program.</td><td class="num">52</td></tr>
+    </table>
+    <p>A fault stops the process with a trap code (visible in <a href="/tbdbg.html">tbdbg</a>):</p>
+    <table>
+      <tr><th>code</th><th>fault</th></tr>
+      <tr><td class="num">1</td><td class="d">misaligned instruction fetch (<code>pc</code> not a multiple of 4)</td></tr>
+      <tr><td class="num">2</td><td class="d">out-of-bounds memory access (address at or past the 2&nbsp;MiB window)</td></tr>
+      <tr><td class="num">3</td><td class="d">illegal / unknown opcode</td></tr>
+      <tr><td class="num">4</td><td class="d">divide or remainder by zero</td></tr>
+    </table>
+  </section>
+
+  <section id="pseudo">
+    <h2><span class="n">06</span>Pseudo-instructions</h2>
+    <p>Conveniences the assembler expands to real instructions.</p>
+    <table>
+      <tr><th>write</th><th>expands to</th></tr>
+      <tr><td class="op"><code>nop</code></td><td class="d"><code>add r0, r0, r0</code></td></tr>
+      <tr><td class="op"><code>mov rd, rs</code></td><td class="d"><code>add rd, rs, r0</code></td></tr>
+      <tr><td class="op"><code>li rd, imm</code></td><td class="d"><code>lui rd, hi16</code> ; <code>ori rd, rd, lo16</code> - a full 32-bit constant (a label is relocated at load)</td></tr>
+      <tr><td class="op"><code>push r</code></td><td class="d"><code>addi sp, sp, -4</code> ; <code>sw r, [sp, 0]</code></td></tr>
+      <tr><td class="op"><code>pop r</code></td><td class="d"><code>lw r, [sp, 0]</code> ; <code>addi sp, sp, 4</code></td></tr>
+      <tr><td class="op"><code>j label</code></td><td class="d"><code>bra label</code> (unconditional)</td></tr>
+    </table>
+  </section>
+
+  <section id="asm">
+    <h2><span class="n">07</span>Assembler syntax</h2>
+    <p>One instruction or directive per line. Operands are comma-separated. Comments run to end of line after
+      <code>;</code>, <code>//</code>, or <code>#</code>.</p>
+    <ul class="list">
+      <li><strong>Registers:</strong> <code>r0</code>-<code>r15</code>, or the aliases <code>zero sp fp lr</code>.</li>
+      <li><strong>Memory:</strong> <code>[base, offset]</code>; the offset is optional (<code>[sp]</code> is <code>[sp, 0]</code>).</li>
+      <li><strong>Immediates:</strong> decimal, <code>0x</code> hex, <code>0o</code> octal, <code>0b</code> binary; a label; or <code>label &plusmn; offset</code>.</li>
+      <li><strong>Labels:</strong> <code>name:</code> defines one; reference it by name in a branch, <code>li</code>, or <code>.word</code>. <code>_start</code> is the default entry point.</li>
+    </ul>
+    <table>
+      <tr><th>directive</th><th>effect</th></tr>
+      <tr><td class="op"><code>.text .rodata .data .bss</code></td><td class="d">select a section (also <code>.section NAME</code>). <code>.text</code> is based at <code>0x1000</code>; sections are placed in order, word-aligned.</td></tr>
+      <tr><td class="op"><code>.equ</code> / <code>.set NAME, VAL</code></td><td class="d">define an assemble-time constant.</td></tr>
+      <tr><td class="op"><code>.align N</code></td><td class="d">pad to an <code>N</code>-byte boundary.</td></tr>
+      <tr><td class="op"><code>.word</code> / <code>.byte v, ...</code></td><td class="d">emit 32-bit words / bytes (a <code>.word</code> may be a label, relocated at load).</td></tr>
+      <tr><td class="op"><code>.asciz</code> / <code>.string</code> / <code>.ascii "..."</code></td><td class="d">emit string bytes; <code>.asciz</code>/<code>.string</code> append a NUL.</td></tr>
+      <tr><td class="op"><code>.space</code> / <code>.skip N</code></td><td class="d">emit <code>N</code> zero bytes.</td></tr>
+      <tr><td class="op"><code>.globl NAME</code></td><td class="d">accepted (all labels are already global); no effect.</td></tr>
+      <tr><td class="op"><code>.entry LABEL</code></td><td class="d">set the entry point (default <code>_start</code>).</td></tr>
+    </table>
+    <p>Assemble with <code>as file.s -o out</code> in the terminal (the host toolchain is <code>tbas.py</code>).
+      <code>cc</code> emits <code>.s</code>, so <code>cc x.c -o x</code> then studying the disassembly is the fast
+      way to see what any C compiles to.</p>
+    <pre><span class="c">; minimal program: write "hi\n" and exit</span>
+.text
+_start:
+    li   r7, 1              <span class="c">; write</span>
+    li   r1, 1              <span class="c">; fd = stdout</span>
+    li   r2, msg
+    li   r3, 3              <span class="c">; len</span>
+    sys
+    li   r7, 11             <span class="c">; exit</span>
+    li   r1, 0
+    sys
+.rodata
+msg:
+    .ascii "hi\n"</pre>
+  </section>
+
+  <footer>
+    <code>as</code> and the TB32 ISA are the base of the TonicBoxOS toolchain. Part of <a href="https://tonicbox.dev">tonicbox.dev</a>.
+    <p class="copyright">&copy; 2026 TonicBox</p>
+  </footer>
+
+</div>
+</body>
+</html>

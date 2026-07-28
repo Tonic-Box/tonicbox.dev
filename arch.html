@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Architecture - TonicBoxOS</title>
+<meta name="description" content="How TonicBoxOS is built: a native Zig kernel compiled to WebAssembly running an interpreted TB32 userland, with real processes, signals, a monolithic driver/VFS layer, and a self-hosting toolchain - plus its design limits.">
+<link rel="canonical" href="https://tonicbox.dev/arch.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230b0e14'/><text x='2' y='12' font-family='monospace' font-size='11' fill='%237aa2f7'>&gt;_</text></svg>">
+<link rel="stylesheet" href="docs.css?v=1">
+<style>
+  html { scroll-behavior: smooth; }
+
+  .wrap { max-width: 860px; margin: 0 auto; }
+
+  header.hero { margin-bottom: 2.5rem; }
+
+  h1 .accent { color: var(--green); }
+
+  .lede { color: var(--dim); font-size: 15px; max-width: 66ch; }
+
+  .meta { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.1rem; }
+
+  .chip {
+      font-size: 12px; color: var(--muted);
+      border: 1px solid var(--border); border-radius: 999px;
+      padding: 0.2rem 0.7rem; background: var(--panel-2);
+    }
+
+  .chip b { color: var(--dim); font-weight: 600; }
+
+  nav.toc {
+      display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem;
+      padding: 0.9rem 1.1rem; margin-bottom: 2.5rem;
+      background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+      font-size: 13px;
+    }
+
+  nav.toc a { color: var(--dim); text-decoration: none; }
+
+  nav.toc a:hover { color: var(--green); }
+
+  nav.toc span { color: var(--border); }
+
+  section { margin-bottom: 2.6rem; scroll-margin-top: 1rem; }
+
+  h2 {
+      font-size: 1.25rem; color: #dbe3ff; font-weight: 600;
+      margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);
+    }
+
+  h2 .n { color: var(--muted); font-weight: 400; margin-right: 0.6rem; font-size: 1rem; }
+
+  section a, .lede a { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
+
+  section a:hover, .lede a:hover { color: var(--cyan); }
+
+  figure { margin: 1.2rem 0 0.6rem; }
+
+  figure img { display: block; width: 100%; max-width: 560px; margin: 0 auto; }
+
+  figcaption { text-align: center; color: var(--muted); font-size: 11.5px; margin-top: 0.5rem; }
+
+  table { width: 100%; border-collapse: collapse; margin: 0.3rem 0 0.4rem; font-size: 13.5px; }
+
+  th, td { text-align: left; padding: 0.45rem 0.7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  td.k { white-space: nowrap; }
+
+  td.k code { color: var(--green); }
+
+  td.desc { color: var(--dim); }
+
+  ul.list { list-style: none; margin: 0.2rem 0 1rem; }
+
+  ul.list li { position: relative; padding-left: 1.4rem; margin-bottom: 0.45rem; color: var(--dim); }
+
+  ul.list li::before { content: ""; position: absolute; left: 0.15rem; top: 0.66em; width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
+
+  ul.list li strong { color: var(--text); }
+
+  footer { margin-top: 3.2rem; padding-top: 1.4rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 12.5px; }
+
+  footer a:hover { color: var(--green); }
+
+  @media (max-width: 560px) {
+      body { font-size: 14px; }
+      h1 { font-size: 1.6rem; }
+      nav.toc span { display: none; }
+    }
+</style>
+  <script>(function(){var s=document.createElement("script");var h=location.hostname;s.src=(h==="localhost"||h==="127.0.0.1"?"":"https://tonicbox.dev")+"/nav.js?v=22";s.defer=true;document.head.appendChild(s);})();</script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">TonicBoxOS &middot; architecture</div>
+    <h1><span class="accent">Architecture</span> &amp; limits</h1>
+    <p class="lede">
+      A complete operating system that runs in a browser tab. A Zig kernel, compiled to WebAssembly, runs an
+      interpreted userland for a custom 32-bit ISA (TB32). The kernel is native code; userland reaches it only
+      across a system-call boundary.
+    </p>
+    <div class="meta">
+      <span class="chip"><b>kernel</b> Zig to WASM</span>
+      <span class="chip"><b>userland</b> interpreted TB32</span>
+      <span class="chip"><b>processes</b> fork / exec / wait</span>
+      <span class="chip"><b>drivers</b> monolithic VFS</span>
+    </div>
+  </header>
+
+  <nav class="toc">
+    <a href="#stack">the stack</a><span>/</span>
+    <a href="#proc">processes</a><span>/</span>
+    <a href="#kernel">kernel &amp; VFS</a><span>/</span>
+    <a href="#tools">toolchain</a><span>/</span>
+    <a href="#limits">limits</a>
+  </nav>
+
+  <section id="stack">
+    <h2><span class="n">00</span>The stack</h2>
+    <p>Three layers:</p>
+    <table>
+      <tr><th>Layer</th><th>What it is</th></tr>
+      <tr><td class="k">host</td><td class="desc">a JavaScript shim: feeds input, paints an output buffer to the screen, and ticks the kernel while idle</td></tr>
+      <tr><td class="k">kernel</td><td class="desc"><code>tbvm.wasm</code>, native WebAssembly: scheduler, process table, signals, filesystem, drivers</td></tr>
+      <tr><td class="k">userland</td><td class="desc">TB32 code, interpreted per instruction; one isolated 2&nbsp;MiB window per process</td></tr>
+    </table>
+    <p>
+      Userland enters the kernel only through a <code>SYS</code> instruction, with the call number in
+      <code>r7</code>. Windows are isolated: there is no shared memory and no way to address another
+      process's window.
+    </p>
+    <figure>
+      <img src="arch-runtime.svg" alt="Three stacked layers: the browser host (JavaScript driver) exchanges bytes with the tbvm.wasm native Zig kernel; below a dashed syscall boundary sits the TB32 userland, where init (PID 1) forks and execs syslogd, the login shell -sh, and commands, each in its own isolated 2 MiB window.">
+      <figcaption>Host, kernel, and an isolated userland across the syscall boundary.</figcaption>
+    </figure>
+  </section>
+
+  <section id="proc">
+    <h2><span class="n">01</span>Processes</h2>
+    <p>
+      <code>fork</code> copies a process into a fresh window; <code>exec</code> replaces the image in place;
+      <code>wait</code> reaps children. Scheduling is <strong>preemptive round-robin</strong>: each runnable
+      process gets a fixed instruction quantum (200k instructions) per turn, so daemons and background jobs
+      advance while the shell waits at a prompt.
+    </p>
+    <p>
+      Boot enters <code>init</code> as <strong>PID&nbsp;1</strong>: it spawns the services and, on the
+      interactive console, a getty-style <code>login</code> that authenticates against <code>/etc/shadow</code>
+      and drops privileges to your login shell (the system is multi-user - <code>root</code>, <code>tonicbox</code>,
+      <code>dev</code> - with euid-enforced permissions). <code>init</code> then reaps orphans for the rest of the session. Signals are complete: handlers, masks, default actions,
+      and job control. PID&nbsp;1 ignores any signal for which it has no handler installed, so userland cannot
+      terminate it.
+    </p>
+    <p>
+      Processes talk over real <code>pipe</code>s, and the console has an in-kernel <strong>termios line
+      discipline</strong> (cooked/raw modes, echo, editing). The shell is a <strong>session leader</strong>
+      that puts each job in its own process group and hands the terminal to the foreground job, so
+      <code>Ctrl&#8209;C</code>, <code>Ctrl&#8209;Z</code>, and <code>fg</code>/<code>bg</code> behave the way
+      they do on a real Unix.
+    </p>
+    <table>
+      <tr><th>Piece</th><th>What it is</th></tr>
+      <tr><td class="k"><code>init</code></td><td class="desc">PID 1; spawns services + the login shell, reaps orphans</td></tr>
+      <tr><td class="k"><code>syslogd</code></td><td class="desc">a daemon draining the kernel log to <code>/var/log/messages</code></td></tr>
+      <tr><td class="k">scheduler</td><td class="desc">preemptive round-robin over a pool of process windows</td></tr>
+      <tr><td class="k">signals</td><td class="desc"><code>kill</code>, handlers, <code>pause</code>, job control</td></tr>
+    </table>
+  </section>
+
+  <section id="kernel">
+    <h2><span class="n">02</span>Kernel &amp; VFS</h2>
+    <p>
+      A <strong>monolithic VFS</strong>, Linux-style: a mount table routes each path to a filesystem type, and
+      file operations dispatch from there.
+    </p>
+    <ul class="list">
+      <li><strong>ramfs</strong>: a real inode filesystem - a superblock, an inode table, a data-block bitmap, and data blocks, with directories stored as dentry blocks. It supports symbolic and hard links.</li>
+      <li><strong>devfs</strong>: <code>/dev</code> nodes carry a device number and dispatch through an in-kernel <strong>char-driver registry</strong>, keyed by major number, that exposes <code>read</code>/<code>write</code>/<code>ioctl</code>.</li>
+      <li><strong>procfs</strong>: <code>/proc</code> entries generated on read.</li>
+    </ul>
+    <figure>
+      <img src="arch-vfs.svg" alt="A file syscall (open, read, write, stat, unlink, link) enters the VFS, which looks up the mount table and dispatches to one of three filesystem types: ramfs (an inode filesystem with a superblock, inode table, block bitmap, data blocks, dentry directories, and symlinks plus hard links), devfs (/dev nodes, which route to the char-driver registry keyed by major number), or procfs (content generated on read).">
+      <figcaption>One VFS entry point; three filesystem types; devices reach the driver registry.</figcaption>
+    </figure>
+  </section>
+
+  <section id="tools">
+    <h2><span class="n">03</span>Toolchain</h2>
+    <p>
+      Self-hosting. <a href="tbc.html">TBC</a> (a C subset) compiles to TB32 assembly, and the assembler emits
+      a TBX executable the kernel loads. The compiler and assembler are themselves TB32 programs that run
+      inside the OS, so building and <a href="tbdbg.html">debugging</a> happen entirely in the terminal.
+    </p>
+  </section>
+
+  <section id="limits">
+    <h2><span class="n">04</span>Limits</h2>
+    <p>Structures are fixed-size and in-memory. The main limits:</p>
+    <table>
+      <tr><th>Area</th><th>Limit</th></tr>
+      <tr><td class="k">processes</td><td class="desc">a fixed pool of process windows; beyond it, spawns are refused rather than queued</td></tr>
+      <tr><td class="k">filesystem</td><td class="desc">an in-memory inode/block ramdisk with a fixed inode count and a fixed number of data blocks; state is per-session (reset on reload, or saved to the browser)</td></tr>
+      <tr><td class="k">arguments</td><td class="desc">a command takes a bounded number of arguments</td></tr>
+      <tr><td class="k">streams</td><td class="desc">a pipe is a bounded ring buffer (64&nbsp;KiB); a full pipe blocks the writer until the reader drains it, so large streams flow through without loss</td></tr>
+      <tr><td class="k">compiler</td><td class="desc">TBC is a subset: no floats or structs. It does have enums, typedef, multidimensional arrays with brace initializers, a <code>#if</code>/macro preprocessor, and a malloc/mem*/str* prelude; function pointers are supported (untyped)</td></tr>
+      <tr><td class="k">shell</td><td class="desc">functions are scoped to a single command line and do not persist across prompts</td></tr>
+    </table>
+  </section>
+
+  <footer>
+    TonicBoxOS is a from-scratch VM, kernel, and userland behind the
+    <a href="ctf.html">CTF challenge</a>. Part of <a href="https://tonicbox.dev">tonicbox.dev</a>.
+    <p class="copyright">&copy; 2026 TonicBox</p>
+  </footer>
+
+</div>
+</body>
+</html>

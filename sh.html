@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>sh - the TonicBoxOS shell</title>
+<meta name="description" content="A reference for sh, the TonicBoxOS command shell: pipes, redirection, variables and expansions, command and arithmetic substitution, globbing, if/while/for/case, functions, aliases, and job control.">
+<link rel="canonical" href="https://tonicbox.dev/sh.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230b0e14'/><text x='2' y='12' font-family='monospace' font-size='11' fill='%237aa2f7'>&gt;_</text></svg>">
+<link rel="stylesheet" href="docs.css?v=1">
+<style>
+  html { scroll-behavior: smooth; }
+
+  .wrap { max-width: 860px; margin: 0 auto; }
+
+  header.hero { margin-bottom: 2.5rem; }
+
+  h1 .accent { color: var(--green); }
+
+  .lede { color: var(--dim); font-size: 15px; max-width: 64ch; }
+
+  .meta { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.1rem; }
+
+  .chip {
+      font-size: 12px; color: var(--muted);
+      border: 1px solid var(--border); border-radius: 999px;
+      padding: 0.2rem 0.7rem; background: var(--panel-2);
+    }
+
+  .chip b { color: var(--dim); font-weight: 600; }
+
+  nav.toc {
+      display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem;
+      padding: 0.9rem 1.1rem; margin-bottom: 2.5rem;
+      background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+      font-size: 13px;
+    }
+
+  nav.toc a { color: var(--dim); text-decoration: none; }
+
+  nav.toc a:hover { color: var(--green); }
+
+  nav.toc span { color: var(--border); }
+
+  section { margin-bottom: 2.6rem; scroll-margin-top: 1rem; }
+
+  h2 {
+      font-size: 1.25rem; color: #dbe3ff; font-weight: 600;
+      margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);
+    }
+
+  h2 .n { color: var(--muted); font-weight: 400; margin-right: 0.6rem; font-size: 1rem; }
+
+  .survive {
+      background: rgba(158, 206, 106, 0.05);
+      border: 1px solid rgba(158, 206, 106, 0.22);
+      border-left: 2px solid var(--green);
+      border-radius: 8px; padding: 1.15rem 1.25rem; margin-bottom: 2.5rem;
+    }
+
+  .survive .label { color: var(--green); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; }
+
+  .survive dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1.1rem; margin-top: 0.7rem; }
+
+  .survive dt { color: var(--green); white-space: nowrap; }
+
+  .survive dt code { color: var(--green); background: none; border: none; padding: 0; }
+
+  .survive dd { color: var(--dim); }
+
+  table { width: 100%; border-collapse: collapse; margin: 0.3rem 0 0.4rem; font-size: 13.5px; }
+
+  th, td { text-align: left; padding: 0.45rem 0.7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  td.k { white-space: nowrap; }
+
+  td.k code { color: var(--green); }
+
+  td.desc { color: var(--dim); }
+
+  pre {
+      background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+      padding: 1rem 1.1rem; margin: 0.3rem 0 1rem; overflow-x: auto;
+      font-size: 13px; line-height: 1.6; color: var(--text);
+    }
+
+  pre .c { color: var(--muted); }
+
+  pre .p { color: var(--green); }
+
+  ul.list { list-style: none; margin: 0.2rem 0 1rem; }
+
+  ul.list li { position: relative; padding-left: 1.4rem; margin-bottom: 0.45rem; color: var(--dim); }
+
+  ul.list li::before { content: ""; position: absolute; left: 0.15rem; top: 0.66em; width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
+
+  ul.list li strong { color: var(--text); }
+
+  footer { margin-top: 3.2rem; padding-top: 1.4rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 12.5px; }
+
+  footer a:hover { color: var(--green); }
+
+  @media (max-width: 560px) {
+      body { font-size: 14px; }
+      h1 { font-size: 1.6rem; }
+      nav.toc span { display: none; }
+      .survive dl { grid-template-columns: 1fr; gap: 0.1rem 0; }
+      .survive dd { margin-bottom: 0.5rem; }
+    }
+</style>
+  <script>(function(){var s=document.createElement("script");var h=location.hostname;s.src=(h==="localhost"||h==="127.0.0.1"?"":"https://tonicbox.dev")+"/nav.js?v=22";s.defer=true;document.head.appendChild(s);})();</script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">TonicBoxOS &middot; shell reference</div>
+    <h1><span class="accent">sh</span> - the shell</h1>
+    <p class="lede">
+      The TonicBoxOS command shell: a small POSIX-style <code>sh</code> with pipes, redirection, variables and
+      expansions, command and arithmetic substitution, globbing, control flow, functions, aliases, and job
+      control. It runs interactively in the terminal, executes scripts, and is the login shell that sources
+      your profile.
+    </p>
+    <div class="meta">
+      <span class="chip"><b>pipes</b> | ; &amp;&amp; ||</span>
+      <span class="chip"><b>redirect</b> &gt; &gt;&gt; &lt;</span>
+      <span class="chip"><b>flow</b> if while for case</span>
+      <span class="chip"><b>jobs</b> &amp; fg bg</span>
+    </div>
+  </header>
+
+  <div class="survive">
+    <div class="label">Survival kit</div>
+    <dl>
+      <dt><code>ls | grep err</code></dt><dd>pipe one command into the next</dd>
+      <dt><code>x=5; echo $x</code></dt><dd>set and expand a variable</dd>
+      <dt><code>for f in *.c; do ...</code></dt><dd>loop over a glob</dd>
+      <dt><code>cmd &gt; out.txt</code></dt><dd>redirect output to a file</dd>
+      <dt><code>alias ll='ls -lp'</code></dt><dd>define a shortcut</dd>
+      <dt><code>Ctrl-Z</code> &rarr; <code>fg</code></dt><dd>suspend, then resume a job</dd>
+    </dl>
+  </div>
+
+  <nav class="toc">
+    <a href="#run">running</a><span>/</span>
+    <a href="#builtins">builtins</a><span>/</span>
+    <a href="#vars">variables</a><span>/</span>
+    <a href="#expand">expansions</a><span>/</span>
+    <a href="#pipes">pipes &amp; redirection</a><span>/</span>
+    <a href="#flow">control flow</a><span>/</span>
+    <a href="#funcs">functions &amp; aliases</a><span>/</span>
+    <a href="#jobs">jobs</a><span>/</span>
+    <a href="#limits">limits</a>
+  </nav>
+
+  <section id="run">
+    <h2><span class="n">00</span>Running</h2>
+    <p>
+      With no arguments <code>sh</code> is an interactive read-eval-print loop. It draws its own prompt -
+      <code>user@dev:~/path$</code> in green, or <code>root@dev:...#</code> in red when you are root - and
+      <code>~</code> abbreviates your <code>$HOME</code>. It also runs non-interactively:
+    </p>
+    <table>
+      <tr><th>Form</th><th>Runs</th></tr>
+      <tr><td class="k"><code>sh SCRIPT [args]</code></td><td class="desc">a script file; <code>$0</code> is the script, <code>$1</code>&hellip; the arguments</td></tr>
+      <tr><td class="k"><code>sh -c 'CMDS' [name [args]]</code></td><td class="desc">a command string, with optional positional parameters</td></tr>
+      <tr><td class="k"><code>#!/bin/sh</code></td><td class="desc">a shebang script, run through the shell by the kernel</td></tr>
+    </table>
+    <p>
+      Started as a <strong>login shell</strong> (argv&#8203;[0] beginning with <code>-</code>), it first sources
+      <code>/etc/profile</code> and then <code>~/.profile</code> - that is where the default aliases and
+      environment live.
+    </p>
+    <p>
+      Input can span several lines. If a line ends inside an open quote, on a trailing <code>|</code>,
+      <code>&amp;&amp;</code> or <code>||</code>, inside an unclosed <code>if</code> / <code>while</code> /
+      <code>for</code> / <code>case</code> / <code>{</code> block, or right after a bare function head, the
+      shell keeps reading until the command is complete.
+    </p>
+  </section>
+
+  <section id="builtins">
+    <h2><span class="n">01</span>Builtins</h2>
+    <p>These run inside the shell itself rather than as separate programs:</p>
+    <table>
+      <tr><th>Builtin</th><th>Effect</th></tr>
+      <tr><td class="k"><code>cd [DIR]</code></td><td class="desc">change directory; no argument goes to your home</td></tr>
+      <tr><td class="k"><code>exit [N]</code></td><td class="desc">leave the shell with status <code>N</code></td></tr>
+      <tr><td class="k"><code>export NAME[=VAL]</code></td><td class="desc">put a variable into the environment for child programs</td></tr>
+      <tr><td class="k"><code>unset NAME</code></td><td class="desc">remove a variable</td></tr>
+      <tr><td class="k"><code>read VAR</code></td><td class="desc">read one line of input into <code>VAR</code> (status 1 at end of input)</td></tr>
+      <tr><td class="k"><code>test EXPR</code> / <code>[ EXPR ]</code></td><td class="desc">evaluate a condition (see below)</td></tr>
+      <tr><td class="k"><code>true</code> / <code>false</code> / <code>:</code></td><td class="desc">do nothing, with status 0 / 1 / 0</td></tr>
+      <tr><td class="k"><code>.</code> / <code>source FILE</code></td><td class="desc">run a file's commands in the current shell</td></tr>
+      <tr><td class="k"><code>alias</code> / <code>unalias</code></td><td class="desc">define, list, or remove aliases</td></tr>
+      <tr><td class="k"><code>umask [OCT]</code></td><td class="desc">show or set the octal file-creation mask</td></tr>
+      <tr><td class="k"><code>jobs</code> / <code>fg</code> / <code>bg</code></td><td class="desc">job control (see below)</td></tr>
+    </table>
+    <p>
+      Anything else is resolved as an alias, then a builtin, then a function, then an external program (found via
+      <code>execvp</code> on <code>$PATH</code>). <code>test</code> / <code>[</code> understand
+      <code>-z</code> / <code>-n</code> (empty / non-empty string), <code>-e</code> / <code>-f</code> /
+      <code>-d</code> (path exists / is a file / is a directory), string <code>=</code> and <code>!=</code>,
+      and the integer comparisons <code>-eq -ne -lt -le -gt -ge</code>, plus <code>! EXPR</code> (negate) and a bare <code>STRING</code> (true when non-empty).
+    </p>
+  </section>
+
+  <section id="vars">
+    <h2><span class="n">02</span>Variables</h2>
+    <p>
+      <code>NAME=VALUE</code> (no spaces around <code>=</code>) sets a shell variable; <code>$NAME</code> or
+      <code>${NAME}</code> expands it, and an undefined name expands to nothing. Shell-local variables shadow
+      the environment; <code>export</code> pushes one into the environment so child programs inherit it, and an
+      exported name is kept in sync.
+    </p>
+    <table>
+      <tr><th>Parameter</th><th>Expands to</th></tr>
+      <tr><td class="k"><code>$?</code></td><td class="desc">exit status of the last command</td></tr>
+      <tr><td class="k"><code>$0</code> &hellip; <code>$9</code></td><td class="desc">positional parameters (script name / arguments)</td></tr>
+      <tr><td class="k"><code>$#</code></td><td class="desc">number of positional parameters</td></tr>
+      <tr><td class="k"><code>$@</code> / <code>$*</code></td><td class="desc">all positional parameters, space-separated</td></tr>
+    </table>
+    <pre><span class="c">$</span> name=world
+<span class="c">$</span> echo "hello, $name (last status $?)"
+hello, world (last status 0)</pre>
+  </section>
+
+  <section id="expand">
+    <h2><span class="n">03</span>Expansions</h2>
+    <p>
+      <strong>Quoting.</strong> <code>'single quotes'</code> are fully literal - nothing inside expands.
+      <code>"double quotes"</code> keep spaces as one word but still expand <code>$</code>. There is no
+      backslash escaping; use quotes to include spaces or special characters.
+    </p>
+    <table>
+      <tr><th>Expansion</th><th>Does</th></tr>
+      <tr><td class="k"><code>$(command)</code></td><td class="desc">substitutes the command's output (trailing newlines trimmed)</td></tr>
+      <tr><td class="k"><code>$(( expr ))</code></td><td class="desc">integer arithmetic: <code>+ - * / %</code>, unary <code>-</code>, parentheses, and variable names</td></tr>
+      <tr><td class="k"><code>*</code></td><td class="desc">matches any run of characters in one directory</td></tr>
+      <tr><td class="k"><code>?</code></td><td class="desc">matches a single character</td></tr>
+    </table>
+    <pre><span class="c">$</span> echo "there are $(ls *.c | wc -l) sources"
+<span class="c">$</span> echo $(( (3 + 4) * 2 ))
+14</pre>
+    <p>A glob that matches nothing is left untouched, so the literal pattern is passed through.</p>
+  </section>
+
+  <section id="pipes">
+    <h2><span class="n">04</span>Pipes &amp; redirection</h2>
+    <table>
+      <tr><th>Operator</th><th>Effect</th></tr>
+      <tr><td class="k"><code>a | b</code></td><td class="desc">pipe <code>a</code>'s output into <code>b</code>; stages run concurrently</td></tr>
+      <tr><td class="k"><code>a ; b</code></td><td class="desc">run <code>a</code>, then <code>b</code></td></tr>
+      <tr><td class="k"><code>a &amp;&amp; b</code></td><td class="desc">run <code>b</code> only if <code>a</code> succeeded</td></tr>
+      <tr><td class="k"><code>a || b</code></td><td class="desc">run <code>b</code> only if <code>a</code> failed</td></tr>
+      <tr><td class="k"><code>cmd &gt; f</code> / <code>&gt;&gt; f</code></td><td class="desc">send stdout to a file (truncate / append)</td></tr>
+      <tr><td class="k"><code>cmd &lt; f</code></td><td class="desc">read stdin from a file</td></tr>
+      <tr><td class="k"><code>cmd &amp;</code></td><td class="desc">run in the background</td></tr>
+    </table>
+    <p>
+      Pipelines are real forked processes joined by pipes, so a reader that exits early terminates the writer -
+      <code>yes | head</code> stops cleanly. A background command prints <code>[bg] PID</code> and is announced
+      as <code>[done] PID</code> at the next prompt.
+    </p>
+  </section>
+
+  <section id="flow">
+    <h2><span class="n">05</span>Control flow</h2>
+    <pre><span class="p">if</span> test -f config; <span class="p">then</span>
+  echo found
+<span class="p">elif</span> test -d config; <span class="p">then</span>
+  echo a directory
+<span class="p">else</span>
+  echo missing
+<span class="p">fi</span>
+
+<span class="p">while</span> read line; <span class="p">do</span> echo "$line"; <span class="p">done</span> &lt; file
+
+<span class="p">for</span> f <span class="p">in</span> *.c; <span class="p">do</span> echo "$f"; <span class="p">done</span>
+
+<span class="p">case</span> "$answer" <span class="p">in</span>
+  y|yes) echo ok ;;
+  *)     echo no ;;
+<span class="p">esac</span></pre>
+    <p>
+      A command is "true" when its exit status is 0. <code>until</code> is <code>while</code> with the condition
+      negated. <code>case</code> patterns are globs and may list alternatives separated by <code>|</code>; the
+      first matching branch runs.
+    </p>
+  </section>
+
+  <section id="funcs">
+    <h2><span class="n">06</span>Functions &amp; aliases</h2>
+    <p>
+      A function groups commands under a name. Inside it, <code>$1</code>, <code>$2</code>&hellip; are the
+      arguments passed to the call and <code>$#</code> their count.
+    </p>
+    <pre><span class="c">$</span> greet() { echo "hi, $1"; }
+<span class="c">$</span> greet world
+hi, world</pre>
+    <p>
+      An <strong>alias</strong> is a shortcut expanded before the command runs. <code>alias name='value'</code>
+      defines one, <code>alias</code> with no arguments lists them, and <code>unalias name</code> removes one.
+      Expansion is recursive but loop-safe - an alias can refer to a command of the same name without recursing
+      forever. The default aliases (<code>ll</code>, <code>la</code>, <code>..</code>, &hellip;) are defined in
+      <code>/etc/profile</code>.
+    </p>
+  </section>
+
+  <section id="jobs">
+    <h2><span class="n">07</span>Jobs</h2>
+    <p>
+      Job control is active only when a real interactive terminal is attached (piped or headless input runs the
+      shell as a plain non-interactive loop with no job control).
+    </p>
+    <table>
+      <tr><th>Action</th><th>Effect</th></tr>
+      <tr><td class="k"><code>cmd &amp;</code></td><td class="desc">start a job in the background</td></tr>
+      <tr><td class="k"><code>Ctrl-Z</code></td><td class="desc">suspend the foreground job (<code>[N]+ Stopped</code>)</td></tr>
+      <tr><td class="k"><code>jobs</code></td><td class="desc">list active jobs</td></tr>
+      <tr><td class="k"><code>fg [N]</code></td><td class="desc">resume a job in the foreground</td></tr>
+      <tr><td class="k"><code>bg [N]</code></td><td class="desc">resume a suspended job in the background</td></tr>
+    </table>
+  </section>
+
+  <section id="limits">
+    <h2><span class="n">08</span>Limits</h2>
+    <ul class="list">
+      <li><strong>Arithmetic is integer-only.</strong> <code>$(( ))</code> has no comparison, bitwise, or assignment operators; division or modulo by zero leaves the value unchanged.</li>
+      <li><strong>Globbing is <code>*</code> and <code>?</code> only.</strong> There are no <code>[...]</code> character classes, brace <code>{}</code> expansion, or general <code>~</code> expansion (bare <code>cd</code> still goes home).</li>
+      <li><strong>Redirection covers stdin and stdout.</strong> Only <code>&lt;</code>, <code>&gt;</code>, and <code>&gt;&gt;</code> - there is no stderr redirect, file-descriptor duplication, or here-documents.</li>
+      <li><strong><code>read</code> fills one variable</strong> with the whole line; it does not split the line across multiple names.</li>
+      <li><strong>Leading assignments persist.</strong> <code>NAME=VAL cmd</code> sets the variable in the shell rather than scoping it to that single command.</li>
+      <li><strong>Capacities.</strong> Up to 64 variables and 64 aliases (names &le; 31 chars, values &le; 255), 32 functions, 16 positional parameters, and a 16 KB command line; <code>while</code> / <code>until</code> loops stop after 100000 iterations.</li>
+    </ul>
+  </section>
+
+  <footer>
+    <code>sh</code> ships in the TonicBoxOS userland, written in
+    <a href="tbc.html">TBC</a>. Part of <a href="https://tonicbox.dev">tonicbox.dev</a>.
+    <p class="copyright">&copy; 2026 TonicBox</p>
+  </footer>
+
+</div>
+</body>
+</html>

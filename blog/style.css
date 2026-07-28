@@ -189,8 +189,35 @@ article .post-head .meta a:hover {
   margin: 0 0 1.1rem 1.4rem;
 }
 
+.post-body ul li::marker {
+  color: var(--muted);
+}
+
 .post-body li {
   margin-bottom: 0.4rem;
+}
+
+.post-body ol {
+  list-style: none;
+  counter-reset: step;
+  margin: 0 0 1.2rem;
+  padding: 0;
+}
+
+.post-body ol > li {
+  counter-increment: step;
+  position: relative;
+  padding-left: 2.1rem;
+  margin-bottom: 0.2rem;
+}
+
+.post-body ol > li::before {
+  content: counter(step) ".";
+  position: absolute;
+  left: 0.1rem;
+  top: 0;
+  color: var(--blue);
+  font-variant-numeric: tabular-nums;
 }
 
 .post-body a {
@@ -198,8 +225,16 @@ article .post-head .meta a:hover {
   text-underline-offset: 3px;
 }
 
+.post-body a.ref {
+  color: var(--cyan);
+}
+
 .post-body strong {
   color: var(--heading);
+}
+
+.post-body .term {
+  color: var(--cyan);
 }
 
 .post-body code {
@@ -253,6 +288,17 @@ article .post-head .meta a:hover {
 .graph img {
   width: 340px;
   max-width: 100%;
+  height: auto;
+}
+
+.graph.wide img {
+  width: auto;
+  max-width: 100%;
+  height: auto;
+}
+
+.graph.fill img {
+  width: 100%;
   height: auto;
 }
 

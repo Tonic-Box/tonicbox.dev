@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TBC - restricted C for TonicBoxOS</title>
+<meta name="description" content="The restricted C dialect used across TonicBoxOS: what it supports and how it differs from standard C.">
+<link rel="canonical" href="https://tonicbox.dev/tbc.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230b0e14'/><text x='2' y='12' font-family='monospace' font-size='11' fill='%237aa2f7'>&gt;_</text></svg>">
+<link rel="stylesheet" href="docs.css?v=1">
+<style>
+  html { scroll-behavior: smooth; }
+
+  .wrap { max-width: 860px; margin: 0 auto; }
+
+  header.hero { margin-bottom: 2.75rem; }
+
+  h1 .accent { color: var(--blue); }
+
+  .lede { color: var(--dim); font-size: 15px; max-width: 62ch; }
+
+  .meta { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.1rem; }
+
+  .chip {
+      font-size: 12px; color: var(--muted);
+      border: 1px solid var(--border); border-radius: 999px;
+      padding: 0.2rem 0.7rem; background: var(--panel-2);
+    }
+
+  .chip b { color: var(--dim); font-weight: 600; }
+
+  nav.toc {
+      display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem;
+      padding: 0.9rem 1.1rem; margin-bottom: 2.5rem;
+      background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+      font-size: 13px;
+    }
+
+  nav.toc a { color: var(--dim); text-decoration: none; }
+
+  nav.toc a:hover { color: var(--blue); }
+
+  nav.toc span { color: var(--border); }
+
+  section { margin-bottom: 2.75rem; scroll-margin-top: 1rem; }
+
+  h2 {
+      font-size: 1.25rem; color: #dbe3ff; font-weight: 600;
+      margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);
+    }
+
+  h2 .n { color: var(--muted); font-weight: 400; margin-right: 0.6rem; font-size: 1rem; }
+
+  h3 { font-size: 0.98rem; color: var(--cyan); font-weight: 600; margin: 1.4rem 0 0.5rem; }
+
+  p.tight { margin-bottom: 0.4rem; }
+
+  p a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
+
+  p a:hover { color: var(--cyan); }
+
+  pre {
+      background: var(--panel-2); border: 1px solid var(--border);
+      border-left: 2px solid var(--blue); border-radius: 6px;
+      padding: 1rem 1.15rem; overflow-x: auto; margin: 0.5rem 0 1rem; line-height: 1.6;
+    }
+
+  pre code { background: none; border: none; padding: 0; color: var(--text); font-size: 13px; }
+
+  .kw { color: var(--purple); }
+
+  .ty { color: var(--blue); }
+
+  .str { color: var(--green); }
+
+  .num { color: var(--yellow); }
+
+  .com { color: var(--muted); font-style: italic; }
+
+  .fn { color: var(--cyan); }
+
+  .pp { color: var(--red); }
+
+  ul.list { list-style: none; margin: 0.2rem 0 1rem; }
+
+  ul.list li { position: relative; padding-left: 1.4rem; margin-bottom: 0.45rem; color: var(--dim); }
+
+  ul.list li::before { content: ""; position: absolute; left: 0.15rem; top: 0.66em; width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
+
+  ul.list li strong { color: var(--text); }
+
+  table { width: 100%; border-collapse: collapse; margin: 0.3rem 0 1.1rem; font-size: 13.5px; }
+
+  th, td { text-align: left; padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  td:first-child { color: var(--text); white-space: nowrap; }
+
+  td.desc { color: var(--dim); }
+
+  .tag { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 0.06rem 0.5rem; border-radius: 4px; letter-spacing: 0.02em; }
+
+  .yes { color: var(--green); background: rgba(158, 206, 106, 0.12); border: 1px solid rgba(158,206,106,0.25); }
+
+  .no  { color: var(--red);   background: rgba(247, 118, 142, 0.10); border: 1px solid rgba(247,118,142,0.22); }
+
+  .part{ color: var(--yellow);background: rgba(224, 175, 104, 0.10); border: 1px solid rgba(224,175,104,0.22); }
+
+  .callout {
+      background: rgba(247, 118, 142, 0.05);
+      border: 1px solid rgba(247, 118, 142, 0.22);
+      border-left: 2px solid var(--red);
+      border-radius: 6px; padding: 1rem 1.15rem; margin-bottom: 1.1rem;
+    }
+
+  .callout h3 { margin-top: 0; color: var(--red); }
+
+  .callout p { color: var(--dim); }
+
+  footer { margin-top: 3.5rem; padding-top: 1.4rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 12.5px; }
+
+  footer a:hover { color: var(--blue); }
+
+  @media (max-width: 560px) {
+      body { font-size: 14px; }
+      h1 { font-size: 1.6rem; }
+      nav.toc span { display: none; }
+    }
+</style>
+  <script>(function(){var s=document.createElement("script");var h=location.hostname;s.src=(h==="localhost"||h==="127.0.0.1"?"":"https://tonicbox.dev")+"/nav.js?v=22";s.defer=true;document.head.appendChild(s);})();</script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">TonicBoxOS &middot; language reference</div>
+    <h1><span class="accent">TBC</span> - a restricted C</h1>
+    <p class="lede">
+      TBC is the small C dialect that all of TonicBoxOS is written in - the shell, the coreutils, the
+      editor, and the toolchain itself. It compiles to the TB32 instruction set and runs inside the
+      in-browser VM. The compiler is self-hosting: an in-guest <code>cc</code> compiles the very same
+      dialect, byte-for-byte identical to the build-time compiler.
+    </p>
+    <div class="meta">
+      <span class="chip"><b>target</b> TB32 / TBX objects</span>
+      <span class="chip"><b>toolchain</b> cc &rarr; as</span>
+      <span class="chip"><b>model</b> accumulator codegen</span>
+      <span class="chip"><b>self-hosting</b> yes</span>
+    </div>
+  </header>
+
+  <nav class="toc">
+    <a href="#overview">overview</a><span>/</span>
+    <a href="#supported">supported</a><span>/</span>
+    <a href="#prelude">prelude</a><span>/</span>
+    <a href="#example">example</a><span>/</span>
+    <a href="#limits">limitations</a>
+  </nav>
+
+  <section id="overview">
+    <h2><span class="n">00</span>What it is</h2>
+    <p>
+      TBC is <strong>C, minus most of C</strong>. It keeps the shape of the language - functions,
+      pointers, N-D arrays, the full operator set, the familiar control flow, a working preprocessor -
+      but drops the heavy parts: no structs, no floats, no full standard library. The
+      goal was a language small enough to write a compiler for in the language itself, yet real enough
+      to build an operating system's userland in.
+    </p>
+    <p>
+      The honest one-liner: <strong>C with only <code>int</code> and <code>char</code>, no
+      structs/floats, a minimal built-in prelude instead of a full stdlib, and unsigned
+      <code>/ % &gt;&gt;</code>.</strong> Everything below spells that out.
+    </p>
+  </section>
+
+  <section id="supported">
+    <h2><span class="n">01</span>What it supports</h2>
+    <table>
+      <tr><th>Area</th><th>Status</th><th>Notes</th></tr>
+      <tr><td>Types <code>int</code>, <code>char</code></td><td><span class="tag yes">yes</span></td><td class="desc">32-bit <code>int</code>; 1-byte <code>char</code> (read unsigned)</td></tr>
+      <tr><td>Pointers, <code>&amp;x *p</code></td><td><span class="tag yes">yes</span></td><td class="desc">any depth; correct pointer arithmetic on declared pointers/arrays</td></tr>
+      <tr><td>Arrays</td><td><span class="tag yes">yes</span></td><td class="desc"><code>a[i]</code> and multi-dimensional <code>a[i][j]</code>; brace initializers incl. unsized <code>int a[] = {1,2,3}</code> and <code>char s[] = "hi"</code></td></tr>
+      <tr><td>Functions, recursion</td><td><span class="tag yes">yes</span></td><td class="desc">args passed in registers; prototypes / forward declarations OK</td></tr>
+      <tr><td>Function pointers</td><td><span class="tag yes">yes</span></td><td class="desc"><code>int (*fp)(int,int)</code> vars, globals, callback params; untyped (address only)</td></tr>
+      <tr><td>Control flow</td><td><span class="tag yes">yes</span></td><td class="desc"><code>if/else while for do/while switch/case break continue goto return</code></td></tr>
+      <tr><td>Operators</td><td><span class="tag yes">yes</span></td><td class="desc"><code>+ - * / % &amp; | ^ &lt;&lt; &gt;&gt; == != &lt; &lt;= &gt; &gt;= &amp;&amp; || ! ~ ?: ,</code>, <code>++ --</code>, <code>+= -= *= /= %= &amp;= |= ^=</code></td></tr>
+      <tr><td><code>sizeof</code></td><td><span class="tag yes">yes</span></td><td class="desc"><code>sizeof(int)</code>, <code>sizeof(char*)</code>, and <code>sizeof expr</code></td></tr>
+      <tr><td><code>enum</code>, <code>_Bool</code></td><td><span class="tag yes">yes</span></td><td class="desc">named constants; <code>_Bool</code> aliases <code>int</code></td></tr>
+      <tr><td><code>static</code></td><td><span class="tag yes">yes</span></td><td class="desc">file-scope statics and static locals (value kept across calls)</td></tr>
+      <tr><td><code>typedef</code></td><td><span class="tag yes">yes</span></td><td class="desc">aliases for scalar, pointer, array, and function-pointer types</td></tr>
+      <tr><td>Preprocessor</td><td><span class="tag yes">yes</span></td><td class="desc">object &amp; function-like <code>#define</code>, <code>#undef</code>, conditionals <code>#if/#ifdef/#ifndef/#elif/#else/#endif</code> with <code>defined()</code> and constant expressions</td></tr>
+      <tr><td>Headers, multi-file</td><td><span class="tag yes">yes</span></td><td class="desc">split a program across <code>.h</code> files with textual <code>#include "file.h"</code> (resolved relative to the including file; <code>#ifndef</code> guards work) - one translation unit, no linker</td></tr>
+      <tr><td>Literals</td><td><span class="tag yes">yes</span></td><td class="desc">decimal, <code>0x</code> hex, <code>0b</code> binary, <code>0</code> octal, <code>U</code>/<code>L</code> suffixes, full char/string escapes</td></tr>
+      <tr><td>Comments</td><td><span class="tag yes">yes</span></td><td class="desc"><code>//</code> and <code>/* */</code></td></tr>
+    </table>
+  </section>
+
+  <section id="prelude">
+    <h2><span class="n">02</span>The prelude</h2>
+    <p>
+      There is no libc. Every program is compiled with a small built-in prelude of thin syscall
+      wrappers, a handful of memory/string helpers, and the raw <code>__sys(num, a, b, ...)</code>
+      intrinsic underneath. Prelude functions your program never uses are stripped by dead-code
+      elimination, so the prelude is zero-cost - anything beyond it (formatting, custom containers)
+      you write yourself.
+    </p>
+    <pre><code><span class="ty">int</span> <span class="fn">write</span>(<span class="ty">int</span> fd, <span class="ty">char</span>* buf, <span class="ty">int</span> n);   <span class="ty">int</span> <span class="fn">read</span>(<span class="ty">int</span> fd, <span class="ty">char</span>* buf, <span class="ty">int</span> n);
+<span class="ty">int</span> <span class="fn">open</span>(<span class="ty">char</span>* p, <span class="ty">int</span> fl);       <span class="ty">int</span> <span class="fn">close</span>(<span class="ty">int</span> fd);
+<span class="ty">int</span> <span class="fn">stat</span>(<span class="ty">char</span>* p, <span class="ty">char</span>* buf);    <span class="ty">int</span> <span class="fn">listdir</span>(<span class="ty">char</span>* p, <span class="ty">char</span>* b, <span class="ty">int</span> n);
+<span class="ty">int</span> <span class="fn">getcwd</span>(<span class="ty">char</span>* b, <span class="ty">int</span> n);      <span class="ty">int</span> <span class="fn">chdir</span>(<span class="ty">char</span>* p);
+<span class="ty">int</span> <span class="fn">getuid</span>();  <span class="ty">int</span> <span class="fn">geteuid</span>();     <span class="ty">int</span> <span class="fn">unlink</span>(<span class="ty">char</span>* p);
+<span class="ty">int</span> <span class="fn">mkdir</span>(<span class="ty">char</span>* p, <span class="ty">int</span> m);      <span class="ty">int</span> <span class="fn">rmdir</span>(<span class="ty">char</span>* p);   <span class="ty">int</span> <span class="fn">rename</span>(<span class="ty">char</span>* a, <span class="ty">char</span>* b);
+<span class="ty">int</span> <span class="fn">chmod</span>(<span class="ty">char</span>* p, <span class="ty">int</span> m);      <span class="ty">int</span> <span class="fn">chown</span>(<span class="ty">char</span>* p, <span class="ty">int</span> u);
+<span class="ty">int</span> <span class="fn">strlen</span>(<span class="ty">char</span>* s);            <span class="ty">void</span> <span class="fn">exit</span>(<span class="ty">int</span> c);
+<span class="ty">char</span>* <span class="fn">sbrk</span>(<span class="ty">int</span> d);   <span class="ty">char</span>* <span class="fn">malloc</span>(<span class="ty">int</span> n);   <span class="ty">void</span> <span class="fn">free</span>(<span class="ty">char</span>* p);
+<span class="ty">char</span>* <span class="fn">memcpy</span>(<span class="ty">char</span>* d, <span class="ty">char</span>* s, <span class="ty">int</span> n);   <span class="ty">char</span>* <span class="fn">memset</span>(<span class="ty">char</span>* d, <span class="ty">int</span> c, <span class="ty">int</span> n);   <span class="ty">int</span> <span class="fn">memcmp</span>(<span class="ty">char</span>* a, <span class="ty">char</span>* b, <span class="ty">int</span> n);
+<span class="ty">char</span>* <span class="fn">strcpy</span>(<span class="ty">char</span>* d, <span class="ty">char</span>* s);   <span class="ty">char</span>* <span class="fn">strcat</span>(<span class="ty">char</span>* d, <span class="ty">char</span>* s);   <span class="ty">char</span>* <span class="fn">strchr</span>(<span class="ty">char</span>* s, <span class="ty">int</span> c);
+<span class="ty">int</span> <span class="fn">strcmp</span>(<span class="ty">char</span>* a, <span class="ty">char</span>* b);   <span class="ty">int</span> <span class="fn">strncmp</span>(<span class="ty">char</span>* a, <span class="ty">char</span>* b, <span class="ty">int</span> n);
+<span class="ty">int</span> <span class="fn">fork</span>();   <span class="ty">int</span> <span class="fn">getpid</span>();   <span class="ty">int</span> <span class="fn">getppid</span>();   <span class="ty">int</span> <span class="fn">waitpid</span>(<span class="ty">int</span> pid, <span class="ty">int</span> st, <span class="ty">int</span> opt);
+<span class="ty">int</span> <span class="fn">pipe</span>(<span class="ty">int</span> fds);   <span class="ty">int</span> <span class="fn">dup</span>(<span class="ty">int</span> fd);   <span class="ty">int</span> <span class="fn">dup2</span>(<span class="ty">int</span> of, <span class="ty">int</span> nf);
+<span class="ty">int</span> <span class="fn">execve</span>(<span class="ty">char</span>* p);   <span class="ty">int</span> <span class="fn">execvp</span>(<span class="ty">char</span>* p, <span class="ty">int</span> v, <span class="ty">int</span> n);   <span class="ty">int</span> <span class="fn">kill</span>(<span class="ty">int</span> pid, <span class="ty">int</span> sig);
+<span class="ty">int</span> <span class="fn">set_raw</span>(<span class="ty">int</span> on);   <span class="ty">int</span> <span class="fn">read_nb</span>(<span class="ty">int</span> fd, <span class="ty">char</span>* buf, <span class="ty">int</span> len);   <span class="ty">int</span> <span class="fn">ioctl</span>(<span class="ty">int</span> fd, <span class="ty">int</span> req, <span class="ty">char</span>* arg);
+<span class="ty">int</span> <span class="fn">msleep</span>(<span class="ty">int</span> ms);   <span class="ty">int</span> <span class="fn">getrandom</span>(<span class="ty">int</span>* p, <span class="ty">int</span> n);
+<span class="com">// ...plus srun and __sys(num, ...) for anything else</span></code></pre>
+    <p>
+      The <a href="/tbc-std-docs.html">standard-library reference</a> documents every one of these -
+      parameters, return values, error codes, and the syscall each maps to. To reach a syscall the
+      prelude doesn't wrap, call <code>__sys</code> directly; the <a href="/syscalls.html">syscall
+      reference</a> lists every number and its signature.
+    </p>
+  </section>
+
+  <section id="example">
+    <h2><span class="n">03</span>A whole program</h2>
+    <p>Word count, in idiomatic TBC: globals for buffers, everything hand-rolled, and the exit code standing in for output.</p>
+    <pre><code><span class="com">// wc.c - count words in a file</span>
+<span class="ty">char</span> buf[<span class="num">4096</span>];
+
+<span class="ty">int</span> <span class="fn">isblank</span>(<span class="ty">int</span> c) { <span class="kw">return</span> c == <span class="num">32</span> || c == <span class="num">9</span> || c == <span class="num">10</span>; }
+
+<span class="ty">int</span> <span class="fn">main</span>(<span class="ty">int</span> argc, <span class="ty">char</span>** argv) {
+    <span class="ty">int</span> fd; <span class="ty">int</span> n; <span class="ty">int</span> i; <span class="ty">int</span> words; <span class="ty">int</span> inword;
+    <span class="kw">if</span> (argc &lt; <span class="num">2</span>) <span class="fn">exit</span>(<span class="num">1</span>);
+    fd = <span class="fn">open</span>(argv[<span class="num">1</span>], <span class="num">0</span>);
+    n = <span class="fn">read</span>(fd, buf, <span class="num">4096</span>);
+    <span class="fn">close</span>(fd);
+    words = <span class="num">0</span>; inword = <span class="num">0</span>;
+    <span class="kw">for</span> (i = <span class="num">0</span>; i &lt; n; i++) {
+        <span class="kw">if</span> (<span class="fn">isblank</span>(buf[i])) inword = <span class="num">0</span>;
+        <span class="kw">else</span> <span class="kw">if</span> (!inword) { inword = <span class="num">1</span>; words = words + <span class="num">1</span>; }
+    }
+    <span class="fn">exit</span>(words);
+    <span class="kw">return</span> <span class="num">0</span>;
+}</code></pre>
+  </section>
+
+  <section id="limits">
+    <h2><span class="n">04</span>Limitations vs. standard C</h2>
+
+    <p style="color: var(--dim); margin: 0 0 1.25rem;">
+      What TBC <em>does</em> support is in <a class="link" href="#supported">the table above</a> and the
+      <a class="link" href="/tbc-std-docs.html">library reference</a>. This section is only the gaps -
+      what still isn't there vs. standard C.
+    </p>
+
+    <h3>Types</h3>
+    <ul class="list">
+      <li><strong>No <code>short</code>, <code>long</code>, <code>long long</code>, <code>float</code>, <code>double</code>, or the <code>signed</code> keyword.</strong> The only types are <code>int</code>, <code>unsigned int</code>, <code>char</code>, and <code>unsigned char</code>.</li>
+      <li><strong>No <code>struct</code> / <code>union</code></strong> - the big structural gap. Data structures are built from parallel arrays.</li>
+      <li><strong>Function pointers are untyped</strong> - no argument or return-type checking at an indirect call.</li>
+      <li><strong><code>const</code> / <code>volatile</code> / <code>register</code> / <code>extern</code> are accepted but ignored</strong> - no const-correctness enforcement.</li>
+      <li><strong><code>char</code> is unsigned</strong> - a 0-255 byte, so <code>c &lt; 0</code> is never true and there is no <code>signed char</code>.</li>
+    </ul>
+
+    <h3>Preprocessor</h3>
+    <ul class="list">
+      <li><strong>Limited preprocessor</strong> - no <code>#</code>/<code>##</code> stringize/paste, no nested macro re-expansion, and no <code>#include &lt;...&gt;</code> system headers.</li>
+    </ul>
+
+    <h3>Functions &amp; calls</h3>
+    <ul class="list">
+      <li><strong>No varargs (<code>...</code>)</strong> - no <code>printf</code>-style; roll your own.</li>
+      <li><strong>At most six arguments per call</strong> - they are passed in registers <code>r1</code>-<code>r6</code>.</li>
+    </ul>
+
+    <h3>Library &amp; runtime</h3>
+    <ul class="list">
+      <li><strong>No full libc</strong> - no <code>printf</code>, no <code>stdio.h</code>, no <code>math.h</code>; only the built-in prelude and <code>__sys</code>.</li>
+      <li><strong>Single translation unit</strong> - no linker, so separately-compiled objects can't be combined.</li>
+      <li><strong>No inline assembly</strong> beyond <code>__sys</code>.</li>
+    </ul>
+  </section>
+
+  <footer>
+    TBC - the language TonicBoxOS is written in, and compiles itself with.
+    Part of <a href="https://tonicbox.dev">tonicbox.dev</a>.
+    <p class="copyright">&copy; 2026 TonicBox</p>
+  </footer>
+
+</div>
+</body>
+</html>

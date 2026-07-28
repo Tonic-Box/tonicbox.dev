@@ -1,0 +1,28 @@
+// Runtime stack for arch.html. Render: dot -Tsvg arch-runtime.dot -o arch-runtime.svg
+digraph runtime {
+  rankdir=TB;
+  bgcolor="transparent";
+  nodesep=0.35; ranksep=0.5;
+  node [shape=box, style="rounded,filled", fillcolor="#0d111a", color="#2a3554",
+        fontcolor="#c0caf5", fontname="Cascadia Code", fontsize=11, margin="0.22,0.13"];
+  edge [color="#565f89", fontcolor="#7681b3", fontname="Cascadia Code", fontsize=9, arrowsize=0.7];
+
+  host [label=<<b>Browser host</b> &#8212; JavaScript driver<br/><font color="#7681b3" point-size="9">keystrokes in &#183; VT screen out &#183; idle tick</font>>];
+  kernel [color="#7aa2f7", label=<<b>tbvm.wasm</b> &#8212; native Zig kernel<br/><font color="#7681b3" point-size="9">process table &#183; round-robin scheduler &#183; signals<br/>job control &#183; pipes &#183; inode filesystem<br/>tty line discipline &#183; char drivers &#183; syscall dispatch</font>>];
+
+  subgraph cluster_user {
+    labelloc="t";
+    label=<<font color="#565f89" point-size="10">TB32 userland &#8212; each process in an isolated 2 MiB window</font>>;
+    color="#3a4266"; style="dashed,rounded";
+    init [color="#bb9af7", label=<<b>init</b> &#8212; PID 1<br/><font color="#7681b3" point-size="9">reaps orphans</font>>];
+    syslogd [label="syslogd"];
+    sh [color="#9ece6a", label=<<b>-sh</b> &#8212; login shell<br/><font color="#7681b3" point-size="9">session leader &#183; job control</font>>];
+    cmd [label=<commands<br/><font color="#7681b3" point-size="9">ls &#183; vi &#183; cc &#183; htop &#183; connect4 &#8230;</font>>];
+  }
+
+  host -> kernel [dir=both, label="bytes"];
+  kernel -> init [dir=both, style=dashed, label="syscalls (r7)\nscheduling"];
+  init -> syslogd [label="fork+exec"];
+  init -> sh [label="fork+exec"];
+  sh -> cmd [label="fork+exec"];
+}

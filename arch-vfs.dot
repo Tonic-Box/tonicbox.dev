@@ -1,0 +1,23 @@
+// VFS / filesystem for arch.html. Render: dot -Tsvg arch-vfs.dot -o arch-vfs.svg
+digraph vfs {
+  rankdir=TB;
+  bgcolor="transparent";
+  nodesep=0.4; ranksep=0.5;
+  node [shape=box, style="rounded,filled", fillcolor="#0d111a", color="#2a3554",
+        fontcolor="#c0caf5", fontname="Cascadia Code", fontsize=11, margin="0.22,0.13"];
+  edge [color="#565f89", fontcolor="#7681b3", fontname="Cascadia Code", fontsize=9, arrowsize=0.7];
+
+  sys [color="#7aa2f7", label=<file syscall<br/><font color="#7681b3" point-size="9">open &#183; read &#183; write &#183; stat &#183; unlink &#183; link</font>>];
+  vfs [color="#7aa2f7", label=<<b>VFS</b><br/><font color="#7681b3" point-size="9">mount table &#8594; filesystem type</font>>];
+
+  ramfs [color="#9ece6a", label=<<b>ramfs</b> &#8212; inode filesystem<br/><font color="#7681b3" point-size="9">superblock &#183; inode table &#183; block bitmap<br/>data blocks &#183; dentry directories<br/>symlinks + hard links</font>>];
+  devfs [color="#e0af68", label=<<b>devfs</b> &#8212; /dev nodes<br/><font color="#7681b3" point-size="9">dispatch by major number</font>>];
+  procfs [color="#bb9af7", label=<<b>procfs</b> &#8212; /proc<br/><font color="#7681b3" point-size="9">generated on read</font>>];
+  drv [label=<char-driver registry<br/><font color="#7681b3" point-size="9">read &#183; write &#183; ioctl</font>>];
+
+  sys -> vfs;
+  vfs -> ramfs;
+  vfs -> devfs;
+  vfs -> procfs;
+  devfs -> drv [label="major"];
+}

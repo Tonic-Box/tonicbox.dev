@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>vi - the TonicBoxOS editor</title>
+<meta name="description" content="A concise reference for vi, the vim-lite modal editor built into TonicBoxOS: modes, motions, operators, search, and ex commands.">
+<link rel="canonical" href="https://tonicbox.dev/vi.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230b0e14'/><text x='2' y='12' font-family='monospace' font-size='11' fill='%237aa2f7'>&gt;_</text></svg>">
+<link rel="stylesheet" href="docs.css?v=1">
+<style>
+  html { scroll-behavior: smooth; }
+
+  .wrap { max-width: 860px; margin: 0 auto; }
+
+  header.hero { margin-bottom: 2.5rem; }
+
+  h1 .accent { color: var(--green); }
+
+  .lede { color: var(--dim); font-size: 15px; max-width: 64ch; }
+
+  .meta { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.1rem; }
+
+  .chip {
+      font-size: 12px; color: var(--muted);
+      border: 1px solid var(--border); border-radius: 999px;
+      padding: 0.2rem 0.7rem; background: var(--panel-2);
+    }
+
+  .chip b { color: var(--dim); font-weight: 600; }
+
+  nav.toc {
+      display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem;
+      padding: 0.9rem 1.1rem; margin-bottom: 2.5rem;
+      background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+      font-size: 13px;
+    }
+
+  nav.toc a { color: var(--dim); text-decoration: none; }
+
+  nav.toc a:hover { color: var(--green); }
+
+  nav.toc span { color: var(--border); }
+
+  section { margin-bottom: 2.6rem; scroll-margin-top: 1rem; }
+
+  h2 {
+      font-size: 1.25rem; color: #dbe3ff; font-weight: 600;
+      margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);
+    }
+
+  h2 .n { color: var(--muted); font-weight: 400; margin-right: 0.6rem; font-size: 1rem; }
+
+  .survive {
+      background: rgba(158, 206, 106, 0.05);
+      border: 1px solid rgba(158, 206, 106, 0.22);
+      border-left: 2px solid var(--green);
+      border-radius: 8px; padding: 1.15rem 1.25rem; margin-bottom: 2.5rem;
+    }
+
+  .survive .label { color: var(--green); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; }
+
+  .survive dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1.1rem; margin-top: 0.7rem; }
+
+  .survive dt { color: var(--green); white-space: nowrap; }
+
+  .survive dt code { color: var(--green); background: none; border: none; padding: 0; }
+
+  .survive dd { color: var(--dim); }
+
+  table { width: 100%; border-collapse: collapse; margin: 0.3rem 0 0.4rem; font-size: 13.5px; }
+
+  th, td { text-align: left; padding: 0.45rem 0.7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  td.k { white-space: nowrap; }
+
+  td.k code { color: var(--green); }
+
+  td.desc { color: var(--dim); }
+
+  ul.list { list-style: none; margin: 0.2rem 0 1rem; }
+
+  ul.list li { position: relative; padding-left: 1.4rem; margin-bottom: 0.45rem; color: var(--dim); }
+
+  ul.list li::before { content: ""; position: absolute; left: 0.15rem; top: 0.66em; width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
+
+  ul.list li strong { color: var(--text); }
+
+  footer { margin-top: 3.2rem; padding-top: 1.4rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 12.5px; }
+
+  footer a:hover { color: var(--green); }
+
+  @media (max-width: 560px) {
+      body { font-size: 14px; }
+      h1 { font-size: 1.6rem; }
+      nav.toc span { display: none; }
+      .survive dl { grid-template-columns: 1fr; gap: 0.1rem 0; }
+      .survive dd { margin-bottom: 0.5rem; }
+    }
+</style>
+  <script>(function(){var s=document.createElement("script");var h=location.hostname;s.src=(h==="localhost"||h==="127.0.0.1"?"":"https://tonicbox.dev")+"/nav.js?v=22";s.defer=true;document.head.appendChild(s);})();</script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">TonicBoxOS &middot; editor reference</div>
+    <h1><span class="accent">vi</span> - the built-in editor</h1>
+    <p class="lede">
+      A vim-lite modal editor. It draws a full-screen VT100 UI sized to your terminal (80&times;24 by
+      default, and it follows live resizes), so it only runs inside the interactive terminal. The keys
+      are vim's - modes, counts, motions, operators, registers, regex search and substitute, undo/redo,
+      visual mode, dot-repeat, syntax highlighting. Everything documented here is implemented.
+    </p>
+    <div class="meta">
+      <span class="chip"><b>open</b> vi [file]</span>
+      <span class="chip"><b>screen</b> 80&times;24</span>
+      <span class="chip"><b>modes</b> normal / insert / visual / cmdline</span>
+      <span class="chip"><b>undo</b> multi-level + redo</span>
+    </div>
+  </header>
+
+  <div class="survive">
+    <div class="label">Survival kit</div>
+    <dl>
+      <dt><code>vi notes.txt</code></dt><dd>open a file (creates it if missing)</dd>
+      <dt><code>i</code></dt><dd>start typing (insert mode)</dd>
+      <dt><code>Esc</code></dt><dd>stop typing, back to normal mode</dd>
+      <dt><code>:w</code> then <code>Enter</code></dt><dd>save</dd>
+      <dt><code>:wq</code></dt><dd>save and quit</dd>
+      <dt><code>:q!</code></dt><dd>quit, throwing away changes</dd>
+    </dl>
+  </div>
+
+  <nav class="toc">
+    <a href="#modes">modes</a><span>/</span>
+    <a href="#motions">motions</a><span>/</span>
+    <a href="#edit">editing</a><span>/</span>
+    <a href="#yank">yank &amp; undo</a><span>/</span>
+    <a href="#search">search</a><span>/</span>
+    <a href="#ex">ex commands</a><span>/</span>
+    <a href="#limits">limits</a>
+  </nav>
+
+  <section id="modes">
+    <h2><span class="n">00</span>Modes</h2>
+    <p>
+      You start in <strong>normal</strong> mode, where keys are commands, not text. Insert commands
+      (<code>i a o</code>...) drop you into <strong>insert</strong> mode where keys are typed literally;
+      <code>Esc</code> returns to normal. <code>v</code>/<code>V</code> enter <strong>visual</strong> mode
+      to select a span, and <code>:</code> <code>/</code> <code>?</code> open the
+      <strong>command line</strong> at the bottom. The mode shows in the status bar.
+    </p>
+    <p>
+      Most normal-mode commands take a leading <strong>count</strong>: <code>5j</code> moves down five
+      lines, <code>3dd</code> deletes three lines, <code>3x</code> deletes three characters.
+    </p>
+  </section>
+
+  <section id="motions">
+    <h2><span class="n">01</span>Moving around</h2>
+    <table>
+      <tr><th>Keys</th><th>Move to</th></tr>
+      <tr><td class="k"><code>h j k l</code> / arrows</td><td class="desc">left, down, up, right (<code>space</code> also moves right; arrows work in every mode, including insert)</td></tr>
+      <tr><td class="k"><code>w</code> <code>W</code></td><td class="desc">start of next word (<code>W</code> = whitespace-delimited)</td></tr>
+      <tr><td class="k"><code>b</code> <code>B</code></td><td class="desc">start of previous word</td></tr>
+      <tr><td class="k"><code>e</code> <code>E</code></td><td class="desc">end of word</td></tr>
+      <tr><td class="k"><code>0</code> <code>^</code> <code>$</code></td><td class="desc">first column, first non-blank, end of line</td></tr>
+      <tr><td class="k"><code>gg</code> <code>G</code> <code>{N}G</code></td><td class="desc">first line, last line, line N</td></tr>
+      <tr><td class="k"><code>H</code> <code>M</code> <code>L</code></td><td class="desc">top, middle, bottom of the visible screen</td></tr>
+      <tr><td class="k"><code>f{c}</code> <code>t{c}</code></td><td class="desc">forward to / till char <code>c</code> on this line</td></tr>
+      <tr><td class="k"><code>F{c}</code> <code>T{c}</code></td><td class="desc">backward to / till char <code>c</code> on this line</td></tr>
+      <tr><td class="k"><code>;</code> <code>,</code></td><td class="desc">repeat / reverse the last <code>f t F T</code></td></tr>
+      <tr><td class="k"><code>%</code></td><td class="desc">jump to the matching <code>() [] {}</code></td></tr>
+      <tr><td class="k"><code>Ctrl-F</code> <code>Ctrl-B</code></td><td class="desc">page forward / back</td></tr>
+      <tr><td class="k"><code>Ctrl-D</code> <code>Ctrl-U</code></td><td class="desc">half page down / up</td></tr>
+    </table>
+  </section>
+
+  <section id="edit">
+    <h2><span class="n">02</span>Editing</h2>
+    <p><strong>Enter insert mode:</strong></p>
+    <table>
+      <tr><th>Keys</th><th>Action</th></tr>
+      <tr><td class="k"><code>i</code> <code>a</code></td><td class="desc">insert before / after the cursor</td></tr>
+      <tr><td class="k"><code>I</code> <code>A</code></td><td class="desc">insert at first non-blank / end of line</td></tr>
+      <tr><td class="k"><code>o</code> <code>O</code></td><td class="desc">open a new line below / above</td></tr>
+      <tr><td class="k"><code>R</code></td><td class="desc">replace mode (overtype until <code>Esc</code>)</td></tr>
+    </table>
+    <p><strong>Operators</strong> combine with any motion, a count, or themselves for linewise:</p>
+    <table>
+      <tr><th>Keys</th><th>Action</th></tr>
+      <tr><td class="k"><code>d{motion}</code> <code>dd</code></td><td class="desc">delete over motion / whole line (e.g. <code>dw</code>, <code>d$</code>, <code>3dd</code>)</td></tr>
+      <tr><td class="k"><code>c{motion}</code> <code>cc</code></td><td class="desc">change (delete, then insert); <code>cw</code> acts like <code>ce</code></td></tr>
+      <tr><td class="k"><code>y{motion}</code> <code>yy</code></td><td class="desc">yank (copy) into a register</td></tr>
+    </table>
+    <p><strong>Single-key edits:</strong></p>
+    <table>
+      <tr><th>Keys</th><th>Action</th></tr>
+      <tr><td class="k"><code>x</code> <code>X</code></td><td class="desc">delete char under / before cursor</td></tr>
+      <tr><td class="k"><code>r{c}</code></td><td class="desc">replace the single char under cursor with <code>c</code></td></tr>
+      <tr><td class="k"><code>s</code> <code>S</code></td><td class="desc">substitute char / whole line (then insert)</td></tr>
+      <tr><td class="k"><code>C</code> <code>D</code></td><td class="desc">change / delete from cursor to end of line</td></tr>
+      <tr><td class="k"><code>J</code></td><td class="desc">join the next line onto this one</td></tr>
+      <tr><td class="k"><code>~</code></td><td class="desc">toggle case of the char under cursor</td></tr>
+    </table>
+  </section>
+
+  <section id="yank">
+    <h2><span class="n">03</span>Registers, paste, undo, repeat</h2>
+    <table>
+      <tr><th>Keys</th><th>Action</th></tr>
+      <tr><td class="k"><code>p</code> <code>P</code></td><td class="desc">paste after / before (linewise or charwise, matching the yank)</td></tr>
+      <tr><td class="k"><code>"{a-z}</code></td><td class="desc">prefix a yank/delete/paste to use named register <code>a</code>-<code>z</code></td></tr>
+      <tr><td class="k"><code>u</code></td><td class="desc">undo</td></tr>
+      <tr><td class="k"><code>Ctrl-R</code></td><td class="desc">redo</td></tr>
+      <tr><td class="k"><code>.</code></td><td class="desc">repeat the last change (respects a new count)</td></tr>
+    </table>
+    <p>
+      Every delete/change/yank also fills the unnamed register, so a bare <code>p</code> pastes the last
+      thing you cut. Example: <code>"ayy</code> yanks a line into register <code>a</code>, <code>"ap</code>
+      pastes it back.
+    </p>
+    <h2 style="margin-top:2rem;"><span class="n">&nbsp;</span>Visual mode</h2>
+    <table>
+      <tr><td class="k"><code>v</code> <code>V</code></td><td class="desc">start a charwise / linewise selection</td></tr>
+      <tr><td class="k"><code>{motion}</code></td><td class="desc">extend the selection with any motion</td></tr>
+      <tr><td class="k"><code>d</code> <code>x</code> <code>c</code> <code>y</code></td><td class="desc">delete, change, or yank the selection</td></tr>
+      <tr><td class="k"><code>Esc</code></td><td class="desc">cancel the selection</td></tr>
+    </table>
+  </section>
+
+  <section id="search">
+    <h2><span class="n">04</span>Search &amp; substitute</h2>
+    <table>
+      <tr><th>Keys</th><th>Action</th></tr>
+      <tr><td class="k"><code>/{pat}</code> <code>?{pat}</code></td><td class="desc">search forward / backward (wraps around the file)</td></tr>
+      <tr><td class="k"><code>n</code> <code>N</code></td><td class="desc">next / previous match in the same direction</td></tr>
+      <tr><td class="k"><code>*</code></td><td class="desc">search for the word under the cursor</td></tr>
+    </table>
+    <p>
+      Patterns are <strong>basic regular expressions (BRE)</strong>: <code>.</code> any char,
+      <code>*</code> zero-or-more of the previous, <code>[abc]</code> / <code>[a-z]</code> /
+      <code>[^...]</code> classes, <code>^</code> and <code>$</code> anchors, and <code>\</code> to escape
+      a literal. Substitute uses the same engine (see below).
+    </p>
+  </section>
+
+  <section id="ex">
+    <h2><span class="n">05</span>Ex command line (<code>:</code>)</h2>
+    <table>
+      <tr><th>Command</th><th>Action</th></tr>
+      <tr><td class="k"><code>:w</code> <code>:w {file}</code></td><td class="desc">write to the current file (or a named one)</td></tr>
+      <tr><td class="k"><code>:q</code> <code>:q!</code></td><td class="desc">quit - vi never warns about unsaved changes, so <code>:q</code> and <code>:q!</code> are equivalent</td></tr>
+      <tr><td class="k"><code>:wq</code> <code>:x</code></td><td class="desc">write and quit</td></tr>
+      <tr><td class="k"><code>:{N}</code></td><td class="desc">jump to line N</td></tr>
+      <tr><td class="k"><code>:s/pat/repl/</code></td><td class="desc">substitute first match on the current line</td></tr>
+      <tr><td class="k"><code>:s/pat/repl/g</code></td><td class="desc">substitute every match on the line</td></tr>
+      <tr><td class="k"><code>:%s/pat/repl/g</code></td><td class="desc">substitute across the whole file</td></tr>
+      <tr><td class="k"><code>:{A},{B}s/.../g</code></td><td class="desc">substitute within a line range</td></tr>
+      <tr><td class="k"><code>:{A},{B}d</code></td><td class="desc">delete a range of lines</td></tr>
+      <tr><td class="k"><code>:syntax on</code> <code>:syntax off</code></td><td class="desc">toggle syntax highlighting (<code>:syn on</code> / <code>:syn off</code> also work)</td></tr>
+    </table>
+    <p>
+      Ranges accept line numbers, <code>.</code> (current line), <code>$</code> (last line), and
+      <code>%</code> (whole file). In the replacement, <code>&amp;</code> stands for the whole match and
+      <code>\{c}</code> inserts a literal character.
+    </p>
+    <p>
+      <strong>Syntax highlighting</strong> is on by default. vi colors <strong>C</strong>
+      (<code>.c</code>) and <strong>shell</strong> (<code>.sh</code>, or a <code>#!</code> line naming
+      <code>sh</code>) files - keywords, strings, numbers, and comments. Toggle it with
+      <code>:syntax off</code> / <code>:syntax on</code>.
+    </p>
+  </section>
+
+  <section id="limits">
+    <h2><span class="n">06</span>What it does not have</h2>
+    <p>It is deliberately small. Notable gaps versus real vim:</p>
+    <ul class="list">
+      <li><strong>Terminal-sized view (80&times;24 default, follows resizes).</strong> Long lines scroll horizontally to keep the cursor visible. Lines are capped at 255 columns and files at ~800 lines; a file is read in a single 64&nbsp;KiB pass, so anything larger is truncated.</li>
+      <li><strong>No macros</strong> (<code>q</code> / <code>@</code>) and <strong>no marks</strong> (<code>m</code> / <code>`</code>).</li>
+      <li><strong>No <code>:g</code>, no visual-block, no windows/splits or multiple buffers.</strong></li>
+      <li><strong>Named registers are <code>a</code>-<code>z</code> only</strong> - no uppercase append.</li>
+      <li><strong>BRE only</strong> - no <code>\+ \? \|</code>, no capture groups, no word-boundary <code>\&lt; \&gt;</code>. <code>f t</code> stay within the current line.</li>
+      <li><strong>Tab inserts a single space.</strong></li>
+    </ul>
+  </section>
+
+  <footer>
+    vi - the editor TonicBoxOS ships in its own userland, written in
+    <a href="tbc.html">TBC</a>. Part of <a href="https://tonicbox.dev">tonicbox.dev</a>.
+    <p class="copyright">&copy; 2026 TonicBox</p>
+  </footer>
+
+</div>
+</body>
+</html>

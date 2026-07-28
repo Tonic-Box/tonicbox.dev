@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Syscall reference - TonicBoxOS</title>
+<meta name="description" content="The complete TB32 system-call table for TonicBoxOS: every syscall number, its signature, return value, and errors - files, processes, credentials, environment, signals, the debugger, and more. Reachable from TBC via __sys(num, ...).">
+<link rel="canonical" href="https://tonicbox.dev/syscalls.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230b0e14'/><text x='2' y='12' font-family='monospace' font-size='11' fill='%237aa2f7'>&gt;_</text></svg>">
+<link rel="stylesheet" href="docs.css?v=1">
+<style>
+  html { scroll-behavior: smooth; }
+
+  .wrap { max-width: 900px; margin: 0 auto; }
+
+  header.hero { margin-bottom: 2.5rem; }
+
+  h1 .accent { color: var(--cyan); }
+
+  .lede { color: var(--dim); font-size: 15px; max-width: 68ch; }
+
+  .conv {
+      margin-top: 1.2rem; padding: 0.9rem 1.1rem;
+      background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--dim); font-size: 13px;
+    }
+
+  .conv code { color: var(--cyan); }
+
+  .conv strong { color: var(--text); }
+
+  nav.toc {
+      display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem;
+      padding: 0.9rem 1.1rem; margin: 1.6rem 0 2.5rem;
+      background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+      font-size: 13px;
+    }
+
+  nav.toc a { color: var(--dim); text-decoration: none; }
+
+  nav.toc a:hover { color: var(--cyan); }
+
+  nav.toc span { color: var(--border); }
+
+  section { margin-bottom: 2.6rem; scroll-margin-top: 1rem; }
+
+  h2 {
+      font-size: 1.25rem; color: #dbe3ff; font-weight: 600;
+      margin-bottom: 0.9rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);
+    }
+
+  h2 .n { color: var(--muted); font-weight: 400; margin-right: 0.6rem; font-size: 1rem; }
+
+  section a, .lede a { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
+
+  section a:hover, .lede a:hover { color: var(--cyan); }
+
+  table { width: 100%; border-collapse: collapse; margin: 0.3rem 0 0.4rem; font-size: 13px; }
+
+  th, td { text-align: left; padding: 0.45rem 0.7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+
+  th { color: var(--muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  td.num { white-space: nowrap; color: var(--muted); text-align: right; width: 2.5rem; }
+
+  td.sig { white-space: nowrap; }
+
+  td.sig code { color: var(--green); background: none; border: none; padding: 0; font-size: 1em; }
+
+  td.d { color: var(--dim); }
+
+  td.d code { color: var(--cyan); }
+
+  tr.root td.sig code::after { content: " \00b7 root"; color: var(--red); font-size: 0.82em; }
+
+  footer { margin-top: 3.2rem; padding-top: 1.4rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 12.5px; }
+
+  footer a:hover { color: var(--cyan); }
+
+  @media (max-width: 640px) {
+      body { font-size: 14px; }
+      h1 { font-size: 1.6rem; }
+      nav.toc span { display: none; }
+      td.sig { white-space: normal; }
+    }
+</style>
+  <script>(function(){var s=document.createElement("script");var h=location.hostname;s.src=(h==="localhost"||h==="127.0.0.1"?"":"https://tonicbox.dev")+"/nav.js?v=22";s.defer=true;document.head.appendChild(s);})();</script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">TonicBoxOS &middot; TB32 reference</div>
+    <h1><span class="accent">Syscall</span> reference</h1>
+    <p class="lede">
+      Userland reaches the kernel across one boundary: the <code>sys</code> instruction. This is every
+      call it exposes. The <a href="/tbc-std-docs.html">prelude</a> wraps the common ones as ordinary
+      functions; everything else you invoke directly with <code>__sys</code>.
+    </p>
+    <div class="conv">
+      <strong>Convention.</strong> Put the syscall number in <code>r7</code> and up to six arguments in
+      <code>r1</code>-<code>r6</code>; the result comes back in <code>r1</code>. From TBC that is
+      <code>__sys(num, a, b, c, d, e, f)</code>. A negative return is an errno (e.g. <code>-1</code>&nbsp;EPERM,
+      <code>-2</code>&nbsp;ENOENT, <code>-9</code>&nbsp;EBADF, <code>-13</code>&nbsp;EACCES). Calls marked
+      <span style="color:var(--red)">root</span> require an effective uid of 0. Unallocated numbers return
+      <code>-38</code>&nbsp;ENOSYS. A handful of kernel-internal calls (shell&harr;kernel handshakes and
+      other plumbing) exist but are intentionally left off this list - if you're poking at those, you're
+      past needing docs.
+    </div>
+  </header>
+
+  <nav class="toc">
+    <a href="#files">files</a><span>/</span>
+    <a href="#proc">processes</a><span>/</span>
+    <a href="#creds">credentials</a><span>/</span>
+    <a href="#env">environment</a><span>/</span>
+    <a href="#signals">signals &amp; timers</a><span>/</span>
+    <a href="#dbg">debugger</a><span>/</span>
+    <a href="#misc">system &amp; misc</a>
+  </nav>
+
+  <section id="files">
+    <h2><span class="n">01</span>Files &amp; filesystem</h2>
+    <table>
+      <tr><th>#</th><th>call</th><th>what it does</th></tr>
+      <tr><td class="num">0</td><td class="sig"><code>read(int fd, char* buf, int n)</code></td><td class="d">Read up to <code>n</code> bytes into <code>buf</code>, advancing the offset. fd&nbsp;0 / tty devices read the console. Returns bytes read; <code>-9</code> if fd is invalid.</td></tr>
+      <tr><td class="num">78</td><td class="sig"><code>read_nb(int fd, char* buf, int len)</code></td><td class="d">The non-blocking counterpart to <code>read</code>: pull up to <code>len</code> bytes of pending console input into <code>buf</code> without ever blocking. Returns the bytes ready now, or 0 if none. Reads the console stdin regardless of <code>fd</code>.</td></tr>
+      <tr><td class="num">1</td><td class="sig"><code>write(int fd, char* buf, int n)</code></td><td class="d">Write <code>n</code> bytes. fd&nbsp;1/2 go to the console. Returns bytes written; <code>-9</code> if fd isn't open and writable.</td></tr>
+      <tr><td class="num">2</td><td class="sig"><code>open(char* path, int flags)</code></td><td class="d">Open (or create) a file. Flags: <code>O_WRONLY=1 O_RDWR=2 O_CREAT=0x40 O_TRUNC=0x200 O_APPEND=0x400</code>. Returns an fd; <code>-2</code>/<code>-13</code>/<code>-21</code>/<code>-28</code>.</td></tr>
+      <tr><td class="num">3</td><td class="sig"><code>close(int fd)</code></td><td class="d">Release the fd. Always returns 0.</td></tr>
+      <tr><td class="num">5</td><td class="sig"><code>stat(char* path, int* out)</code></td><td class="d">Fill a 5-word stat: <code>out[0]=mode, [4]=uid, [8]=size, [12]=type (1 file / 2 dir), [16]=gid</code>. <code>-2</code> if missing.</td></tr>
+      <tr><td class="num">7</td><td class="sig"><code>listdir(char* path, char* buf, int cap)</code></td><td class="d">Write directory entry names into <code>buf</code>. Returns bytes written; <code>-2</code>/<code>-20</code>.</td></tr>
+      <tr><td class="num">9</td><td class="sig"><code>getcwd(char* buf, int cap)</code></td><td class="d">Copy the working directory into <code>buf</code>. Returns its length.</td></tr>
+      <tr><td class="num">15</td><td class="sig"><code>unlink(char* path)</code></td><td class="d">Delete a regular file. Returns 0; <code>-2</code>/<code>-13</code>/<code>-21</code>.</td></tr>
+      <tr><td class="num">16</td><td class="sig"><code>mkdir(char* path, int mode)</code></td><td class="d">Create a directory (mode masked by the umask). Returns 0; <code>-13</code>/<code>-17</code>/<code>-28</code>.</td></tr>
+      <tr><td class="num">17</td><td class="sig"><code>rmdir(char* path)</code></td><td class="d">Remove an empty directory. Returns 0; <code>-2</code>/<code>-13</code>/<code>-20</code>/<code>-39</code>.</td></tr>
+      <tr><td class="num">18</td><td class="sig"><code>rename(char* old, char* new)</code></td><td class="d">Rename or move an entry, replacing any existing target. Returns 0; <code>-2</code>/<code>-13</code>/<code>-28</code>.</td></tr>
+      <tr><td class="num">19</td><td class="sig"><code>chmod(char* path, int mode)</code></td><td class="d">Set permission bits. Owner or root only. Returns 0; <code>-1</code>&nbsp;EPERM / <code>-2</code>.</td></tr>
+      <tr class="root"><td class="num">23</td><td class="sig"><code>chown(char* path, int uid)</code></td><td class="d">Set both uid and gid of an entry. Returns 0; <code>-1</code>&nbsp;EPERM / <code>-2</code>.</td></tr>
+      <tr><td class="num">25</td><td class="sig"><code>chdir(char* path)</code></td><td class="d">Change the working directory. Returns 0; <code>-2</code>/<code>-20</code>.</td></tr>
+      <tr><td class="num">29</td><td class="sig"><code>lseek(int fd, int off, int whence)</code></td><td class="d">Reposition an fd. <code>whence</code>: 0&nbsp;SET, 1&nbsp;CUR, 2&nbsp;END. Returns the new offset; <code>-9</code>.</td></tr>
+      <tr><td class="num">85</td><td class="sig"><code>pipe(int fds[2])</code></td><td class="d">Create a pipe: <code>fds[0]</code> is the read end, <code>fds[1]</code> the write end. Reading blocks until data or EOF (all writers closed); writing blocks until it fits, and raises <code>SIGPIPE</code>/<code>-32</code>&nbsp;EPIPE once every reader has closed. Returns 0; <code>-24</code>&nbsp;EMFILE.</td></tr>
+      <tr><td class="num">86</td><td class="sig"><code>dup(int oldfd)</code></td><td class="d">Duplicate <code>oldfd</code> onto the lowest free fd, sharing the same open file (and offset). Returns the new fd; <code>-9</code>/<code>-24</code>.</td></tr>
+      <tr><td class="num">87</td><td class="sig"><code>dup2(int oldfd, int newfd)</code></td><td class="d">Duplicate <code>oldfd</code> onto <code>newfd</code> (closing <code>newfd</code> first); <code>newfd</code> may be 0/1/2 to redirect stdio onto a file or pipe. Returns <code>newfd</code>; <code>-9</code>.</td></tr>
+      <tr><td class="num">88</td><td class="sig"><code>symlink(char* target, char* linkpath)</code></td><td class="d">Create a symbolic link at <code>linkpath</code> pointing at <code>target</code>. Returns 0; <code>-13</code>/<code>-17</code>/<code>-28</code>.</td></tr>
+      <tr><td class="num">89</td><td class="sig"><code>readlink(char* path, char* buf, int cap)</code></td><td class="d">Read a symlink's target into <code>buf</code>. Returns its length; <code>-2</code>/<code>-22</code>&nbsp;EINVAL (not a symlink).</td></tr>
+      <tr><td class="num">90</td><td class="sig"><code>lstat(char* path, void* statbuf)</code></td><td class="d">Like <code>stat</code> but does not follow a final symlink (type&nbsp;3&nbsp;= symlink). Returns 0; <code>-2</code>.</td></tr>
+      <tr><td class="num">91</td><td class="sig"><code>link(char* oldpath, char* newpath)</code></td><td class="d">Create a hard link <code>newpath</code> to the same inode as <code>oldpath</code>. Returns 0; <code>-1</code>&nbsp;EPERM (directory) / <code>-13</code>/<code>-17</code>.</td></tr>
+      <tr><td class="num">47</td><td class="sig"><code>umask(int mask)</code></td><td class="d">Set the file-creation mask. Returns the previous mask.</td></tr>
+      <tr><td class="num">49</td><td class="sig"><code>chowng(char* path, int uid, int gid)</code></td><td class="d">Change uid and/or gid; pass <code>-1</code> to leave a field alone. Changing uid needs root; changing gid needs root or (owner and group member). <code>-1</code>/<code>-2</code>.</td></tr>
+    </table>
+  </section>
+
+  <section id="proc">
+    <h2><span class="n">02</span>Processes &amp; exec</h2>
+    <table>
+      <tr><th>#</th><th>call</th><th>what it does</th></tr>
+      <tr><td class="num">11</td><td class="sig"><code>exit(int code)</code></td><td class="d">Terminate the process with an exit code. Does not return.</td></tr>
+      <tr><td class="num">22</td><td class="sig"><code>execve(char* path)</code></td><td class="d">Replace the current image, keeping credentials; <code>argv0 = path</code>. No return on success; <code>-2</code>/<code>-13</code>. Deliberately single-argument.</td></tr>
+      <tr><td class="num">24</td><td class="sig"><code>srun(int argc, char** argv, char* in, int inlen, char* out, int outcap)</code></td><td class="d">Run one command as a child, optionally feeding it <code>in</code> as stdin and capturing stdout into <code>out</code>. Honors setuid/setgid bits. Returns the captured length or the child's exit code (<code>127</code> not found, <code>126</code> not executable, <code>1</code> no free slot).</td></tr>
+      <tr><td class="num">26</td><td class="sig"><code>set_raw(int on)</code></td><td class="d">Toggle raw (unbuffered, no-echo) keystroke input. Returns 0.</td></tr>
+      <tr><td class="num">46</td><td class="sig"><code>execvp(char* path, char** argv, int argc)</code></td><td class="d">PATH-aware <code>execve</code> with an explicit argv vector (so argv0 can differ, e.g. <code>-sh</code>). No return on success; <code>-2</code>/<code>-13</code>.</td></tr>
+      <tr><td class="num">61</td><td class="sig"><code>fork()</code></td><td class="d">Duplicate the process. Returns the child pid to the parent, 0 to the child; <code>-11</code>&nbsp;EAGAIN if no free slot.</td></tr>
+      <tr><td class="num">62</td><td class="sig"><code>waitpid(int pid, int* status, int opts)</code></td><td class="d">Reap a child (<code>pid</code> -1/0 = any). Writes its code to <code>status</code>. Returns the reaped pid, 0 with <code>WNOHANG</code> (opts bit&nbsp;0), or <code>-10</code>&nbsp;ECHILD.</td></tr>
+      <tr><td class="num">63</td><td class="sig"><code>getpid()</code></td><td class="d">Return the process id.</td></tr>
+      <tr><td class="num">64</td><td class="sig"><code>getppid()</code></td><td class="d">Return the parent process id.</td></tr>
+      <tr><td class="num">65</td><td class="sig"><code>procsnapshot(char* buf, int cap)</code></td><td class="d">Write 32-byte records for live processes: <code>[0]=pid, [4]=ppid, [8]=state, [12]=euid, [16..32]=name</code>. Returns the count.</td></tr>
+      <tr><td class="num">79</td><td class="sig"><code>procsnap2(char* buf, int cap)</code></td><td class="d">A richer snapshot (used by <code>htop</code> for CPU%/MEM%/TIME+): <code>buf[0..8]</code> holds <code>clock_ms</code>, then up to <code>cap</code> 48-byte records: <code>[0]=pid, [4]=ppid, [8]=state, [12]=euid, [16]=insns (u64), [24]=start_ms, [28]=mem_bytes, [32..48]=name</code>. Returns the count.</td></tr>
+    </table>
+  </section>
+
+  <section id="creds">
+    <h2><span class="n">03</span>Users, groups &amp; credentials</h2>
+    <table>
+      <tr><th>#</th><th>call</th><th>what it does</th></tr>
+      <tr><td class="num">13</td><td class="sig"><code>getuid()</code></td><td class="d">Return the real uid.</td></tr>
+      <tr><td class="num">14</td><td class="sig"><code>geteuid()</code></td><td class="d">Return the effective uid.</td></tr>
+      <tr><td class="num">30</td><td class="sig"><code>getgid()</code></td><td class="d">Return the real gid.</td></tr>
+      <tr><td class="num">31</td><td class="sig"><code>getegid()</code></td><td class="d">Return the effective gid.</td></tr>
+      <tr><td class="num">32</td><td class="sig"><code>setuid(int uid)</code></td><td class="d">Root sets real+effective+saved uid; otherwise only to the real or saved uid. Returns 0 or <code>-1</code>&nbsp;EPERM.</td></tr>
+      <tr><td class="num">33</td><td class="sig"><code>setgid(int gid)</code></td><td class="d">Same rules as <code>setuid</code>, for the gid. Returns 0 or <code>-1</code>.</td></tr>
+      <tr><td class="num">35</td><td class="sig"><code>seteuid(int euid)</code></td><td class="d">Set the effective uid (to the real/saved uid, or anything if root). <code>-1</code> otherwise.</td></tr>
+      <tr><td class="num">36</td><td class="sig"><code>setegid(int egid)</code></td><td class="d">Set the effective gid, same rules. <code>-1</code> otherwise.</td></tr>
+      <tr class="root"><td class="num">37</td><td class="sig"><code>setreuid(int ruid, int euid)</code></td><td class="d">Set real and effective uid together; <code>-1</code> leaves a field. Saved uid follows the effective. <code>-1</code>&nbsp;EPERM if not root.</td></tr>
+      <tr class="root"><td class="num">38</td><td class="sig"><code>setregid(int rgid, int egid)</code></td><td class="d">Set real and effective gid together; <code>-1</code> leaves a field. <code>-1</code>&nbsp;EPERM if not root.</td></tr>
+      <tr><td class="num">39</td><td class="sig"><code>getgroups(int* list, int size)</code></td><td class="d">Write up to <code>size</code> supplementary gids into <code>list</code> (size 0 = just count). Returns the number of groups.</td></tr>
+      <tr class="root"><td class="num">40</td><td class="sig"><code>setgroups(int* list, int n)</code></td><td class="d">Replace the supplementary groups (up to 16). Returns 0 or <code>-1</code>&nbsp;EPERM.</td></tr>
+      <tr><td class="num">48</td><td class="sig"><code>getlogin(char* out, int cap)</code></td><td class="d">Copy the session's login name into <code>out</code> and put the login time in <code>r2</code>. Returns the name length.</td></tr>
+    </table>
+  </section>
+
+  <section id="env">
+    <h2><span class="n">04</span>Environment</h2>
+    <table>
+      <tr><th>#</th><th>call</th><th>what it does</th></tr>
+      <tr><td class="num">41</td><td class="sig"><code>getenv(char* name, char* out, int cap)</code></td><td class="d">Copy a variable's value into <code>out</code>. Returns its length, or <code>-1</code> if unset.</td></tr>
+      <tr><td class="num">42</td><td class="sig"><code>setenv(char* name, char* val)</code></td><td class="d">Set a variable. Returns 0, or <code>-1</code> if the store is full.</td></tr>
+      <tr><td class="num">43</td><td class="sig"><code>unsetenv(char* name)</code></td><td class="d">Remove a variable. Always returns 0.</td></tr>
+      <tr><td class="num">44</td><td class="sig"><code>getenviron(char* out, int cap)</code></td><td class="d">Copy the packed <code>NAME=VAL\0</code> environment block into <code>out</code>. Returns its byte length.</td></tr>
+    </table>
+  </section>
+
+  <section id="signals">
+    <h2><span class="n">05</span>Signals &amp; timers</h2>
+    <table>
+      <tr><th>#</th><th>call</th><th>what it does</th></tr>
+      <tr><td class="num">66</td><td class="sig"><code>signal(int sig, int handler)</code></td><td class="d">Install a handler: <code>0</code>&nbsp;default, <code>1</code>&nbsp;ignore, else a function address. Returns the previous handler; <code>-1</code> for signal 0, out-of-range, KILL, or STOP.</td></tr>
+      <tr><td class="num">67</td><td class="sig"><code>kill(int pid, int sig)</code></td><td class="d">Send a signal (<code>sig</code>&nbsp;0 = existence check). A negative <code>pid</code> signals process group <code>-pid</code>; <code>pid</code>&nbsp;0 signals the caller's group. Returns 0; <code>-3</code>&nbsp;ESRCH / <code>-22</code>&nbsp;EINVAL.</td></tr>
+      <tr><td class="num">69</td><td class="sig"><code>sigprocmask(int how, int mask)</code></td><td class="d">Adjust the blocked-signal mask. <code>how</code>: 0&nbsp;BLOCK, 1&nbsp;UNBLOCK, 2&nbsp;SET. KILL/STOP are never blockable. Returns the old mask.</td></tr>
+      <tr><td class="num">70</td><td class="sig"><code>pause()</code></td><td class="d">Block until a signal is delivered.</td></tr>
+      <tr><td class="num">92</td><td class="sig"><code>setpgid(int pid, int pgid)</code></td><td class="d">Set a process's group (<code>pid</code>&nbsp;0 = self, <code>pgid</code>&nbsp;0 = its own pid). Returns 0; <code>-3</code>.</td></tr>
+      <tr><td class="num">93</td><td class="sig"><code>getpgid(int pid)</code></td><td class="d">Return a process's group id (<code>pid</code>&nbsp;0 = self).</td></tr>
+      <tr><td class="num">94</td><td class="sig"><code>setsid()</code></td><td class="d">Start a new session; the caller becomes session and group leader. Returns the new session id.</td></tr>
+      <tr><td class="num">95</td><td class="sig"><code>getsid(int pid)</code></td><td class="d">Return a process's session id (<code>pid</code>&nbsp;0 = self).</td></tr>
+      <tr><td class="num">96</td><td class="sig"><code>tcsetpgrp(int fd, int pgrp)</code></td><td class="d">Set the controlling terminal's foreground process group. Returns 0.</td></tr>
+      <tr><td class="num">97</td><td class="sig"><code>tcgetpgrp(int fd)</code></td><td class="d">Return the controlling terminal's foreground process group.</td></tr>
+      <tr><td class="num">73</td><td class="sig"><code>msleep(int ms)</code></td><td class="d">Sleep for <code>ms</code> milliseconds - real-time pacing for game and event loops. Returns 0 once the interval elapses.</td></tr>
+      <tr><td class="num">76</td><td class="sig"><code>sleep(int secs)</code></td><td class="d">Sleep for <code>secs</code> seconds. Returns 0 if the full time elapsed, else the seconds left unslept (a signal cut it short).</td></tr>
+      <tr><td class="num">77</td><td class="sig"><code>alarm(int secs)</code></td><td class="d">Arm a <code>SIGALRM</code> timer (<code>secs</code>&nbsp;0 cancels). Returns the seconds remaining on any prior alarm.</td></tr>
+    </table>
+  </section>
+
+  <section id="dbg">
+    <h2><span class="n">06</span>Debugger (ptrace-like)</h2>
+    <p>
+      These back <a href="tbdbg.html">tbdbg</a> and strace. The tracee runs de-privileged in a dedicated
+      memory window. Status codes are <code>0</code>&nbsp;exited, <code>1</code>&nbsp;breakpoint,
+      <code>2</code>&nbsp;step, <code>3</code>&nbsp;syscall, <code>4</code>&nbsp;fault, <code>5</code>&nbsp;blocked,
+      <code>6</code>&nbsp;subprocess. All return <code>-1</code> when there is no active tracee.
+    </p>
+    <table>
+      <tr><th>#</th><th>call</th><th>what it does</th></tr>
+      <tr><td class="num">50</td><td class="sig"><code>dbg_spawn(char* path, char** argv, int argc)</code></td><td class="d">Load a fresh tracee, stopped at entry. <code>-1</code> if already tracing or tracing a setuid-root binary as non-root; <code>-2</code>/<code>-13</code>.</td></tr>
+      <tr><td class="num">51</td><td class="sig"><code>dbg_step(int* out)</code></td><td class="d">Single-step one instruction. <code>out[0..1] = [status, info]</code>. Returns the status.</td></tr>
+      <tr><td class="num">52</td><td class="sig"><code>dbg_cont(int max, int trace_sys, int* out)</code></td><td class="d">Run up to <code>max</code> instructions (0 = 50M); <code>trace_sys</code> traps syscalls. Returns the stop status.</td></tr>
+      <tr><td class="num">53</td><td class="sig"><code>dbg_regs(int* buf)</code></td><td class="d">Write the 16 registers, then pc (word&nbsp;16) and flags (word&nbsp;17: Z/N/C/V). Returns pc.</td></tr>
+      <tr><td class="num">54</td><td class="sig"><code>dbg_setreg(int idx, int val)</code></td><td class="d">Set a tracee register (<code>idx</code> 0-15) or pc (<code>idx</code> 16). Returns 0.</td></tr>
+      <tr><td class="num">55</td><td class="sig"><code>dbg_read(int addr, int len, char* buf)</code></td><td class="d">Read tracee memory into <code>buf</code>. Returns bytes read.</td></tr>
+      <tr><td class="num">56</td><td class="sig"><code>dbg_write(int addr, int len, char* buf)</code></td><td class="d">Write <code>buf</code> into tracee memory. Returns bytes written.</td></tr>
+      <tr><td class="num">57</td><td class="sig"><code>dbg_break(int addr)</code></td><td class="d">Set a breakpoint (max 16). Returns 0; <code>-1</code> if the table is full.</td></tr>
+      <tr><td class="num">58</td><td class="sig"><code>dbg_unbreak(int addr)</code></td><td class="d">Remove a breakpoint. Returns 0.</td></tr>
+      <tr><td class="num">59</td><td class="sig"><code>dbg_kill()</code></td><td class="d">Detach and discard the tracee. Returns 0.</td></tr>
+      <tr><td class="num">60</td><td class="sig"><code>dbg_statget(int* out)</code></td><td class="d">Read the current status/info without stepping. Returns the status.</td></tr>
+    </table>
+  </section>
+
+  <section id="misc">
+    <h2><span class="n">07</span>System &amp; misc</h2>
+    <table>
+      <tr><th>#</th><th>call</th><th>what it does</th></tr>
+      <tr><td class="num">27</td><td class="sig"><code>time()</code></td><td class="d">Return the current time in epoch seconds.</td></tr>
+      <tr><td class="num">80</td><td class="sig"><code>clock_gettime(int clk, void* ts)</code></td><td class="d">Write <code>{sec, nsec}</code> to <code>ts</code>. <code>clk</code>&nbsp;1&nbsp;MONOTONIC (ms since boot), else REALTIME (epoch). Returns 0.</td></tr>
+      <tr><td class="num">81</td><td class="sig"><code>gettimeofday(void* tv)</code></td><td class="d">Write <code>{sec, usec}</code> (epoch) to <code>tv</code>. Returns 0.</td></tr>
+      <tr><td class="num">82</td><td class="sig"><code>nanosleep(void* req, void* rem)</code></td><td class="d">Sleep for the <code>{sec, nsec}</code> at <code>req</code> (millisecond granularity). Returns 0 once elapsed.</td></tr>
+      <tr><td class="num">83</td><td class="sig"><code>brk(void* addr)</code></td><td class="d">Set the program break (heap top) to <code>addr</code>; <code>brk(0)</code> queries it. Returns 0; <code>-1</code> if it would collide with the stack.</td></tr>
+      <tr><td class="num">84</td><td class="sig"><code>sbrk(int delta)</code></td><td class="d">Grow the heap by <code>delta</code> bytes and return the previous break (used by <code>malloc</code>); <code>(void*)-1</code> on overflow.</td></tr>
+      <tr><td class="num">28</td><td class="sig"><code>getrandom(char* buf, int len)</code></td><td class="d">Fill <code>buf</code> with <code>len</code> pseudo-random bytes (userland PRNG). Returns <code>len</code>.</td></tr>
+      <tr><td class="num">45</td><td class="sig"><code>crypt(char* pw, char* setting, char* out, int cap)</code></td><td class="d">Hash <code>pw</code> with the salt from <code>setting</code>, writing a <code>$5$salt$hash</code> string (SHA-crypt style) into <code>out</code>. Returns its length.</td></tr>
+      <tr><td class="num">71</td><td class="sig"><code>klogread(char* buf, int cap)</code></td><td class="d">Drain the kernel log ring into <code>buf</code> (blocks while empty). Returns bytes drained. (syslogd uses this.)</td></tr>
+      <tr><td class="num">72</td><td class="sig"><code>ioctl(int fd, int req, int arg)</code></td><td class="d">Device control. fd 0/1/2 are the console tty (<code>TIOCGWINSZ 0x5413</code>, <code>TCGETS 0x5401</code>). <code>-9</code>&nbsp;EBADF / <code>-25</code>&nbsp;ENOTTY.</td></tr>
+      <tr class="root"><td class="num">74</td><td class="sig"><code>mount(char* source, char* target, char* fstype)</code></td><td class="d">Mount a filesystem at <code>target</code>. Returns 0; <code>-1</code>/<code>-2</code>/<code>-12</code>/<code>-16</code>/<code>-20</code>.</td></tr>
+      <tr class="root"><td class="num">75</td><td class="sig"><code>umount(char* target)</code></td><td class="d">Unmount a filesystem (<code>/</code> never unmounts). Returns 0; <code>-1</code>/<code>-16</code>/<code>-22</code>.</td></tr>
+      <tr><td class="num">98</td><td class="sig"><code>reboot()</code></td><td class="d">Request a session reboot; the host reseeds the ASLR slide and stack canary and resets the machine to a fresh boot. Returns 0. (The <code>reboot</code> command.)</td></tr>
+    </table>
+  </section>
+
+  <footer>
+    Reached from TBC with <code>__sys(num, ...)</code>; the common calls are wrapped by the
+    <a href="/tbc-std-docs.html">standard-library prelude</a>. Part of
+    <a href="https://tonicbox.dev">tonicbox.dev</a>.
+    <p class="copyright">&copy; 2026 TonicBox</p>
+  </footer>
+
+</div>
+</body>
+</html>

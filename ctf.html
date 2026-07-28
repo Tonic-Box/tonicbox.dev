@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CTF Challenge - TonicBoxOS</title>
+<meta name="description" content="A from-scratch binary-exploitation challenge running in your browser: escalate to root and read the flag.">
+<link rel="canonical" href="https://tonicbox.dev/ctf.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230b0e14'/><text x='2' y='12' font-family='monospace' font-size='11' fill='%237aa2f7'>&gt;_</text></svg>">
+<link rel="stylesheet" href="docs.css?v=1">
+<style>
+  html { scroll-behavior: smooth; }
+
+  .wrap { max-width: 760px; margin: 0 auto; }
+
+  header.hero { margin-bottom: 2.5rem; }
+
+  h1 .accent { color: var(--red); }
+
+  .lede { color: var(--dim); font-size: 15px; max-width: 62ch; }
+
+  section { margin-bottom: 2.25rem; }
+
+  h2 { font-size: 1.2rem; color: #dbe3ff; font-weight: 600; margin-bottom: 0.9rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+
+  h2 .n { color: var(--muted); font-weight: 400; margin-right: 0.6rem; font-size: 1rem; }
+
+  a.link { color: var(--blue); text-decoration: none; }
+
+  a.link:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+  .goal {
+      background: linear-gradient(180deg, rgba(122,162,247,0.07), rgba(122,162,247,0.02));
+      border: 1px solid rgba(122,162,247,0.28);
+      border-left: 2px solid var(--blue);
+      border-radius: 8px; padding: 1.15rem 1.25rem; margin-bottom: 2.25rem;
+    }
+
+  .goal .label { color: var(--blue); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; }
+
+  .goal p { color: var(--text); margin: 0.4rem 0 0; font-size: 1.02rem; }
+
+  .goal code { color: var(--green); background: none; border: none; padding: 0; }
+
+  ul.list { list-style: none; margin: 0.2rem 0 0.6rem; }
+
+  ul.list li { position: relative; padding-left: 1.4rem; margin-bottom: 0.5rem; color: var(--dim); }
+
+  ul.list li::before { content: ""; position: absolute; left: 0.15rem; top: 0.66em; width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
+
+  ul.list li strong { color: var(--text); }
+
+  .steps { counter-reset: step; list-style: none; }
+
+  .steps li { position: relative; padding-left: 2.1rem; margin-bottom: 0.7rem; color: var(--dim); }
+
+  .steps li::before {
+      counter-increment: step; content: counter(step);
+      position: absolute; left: 0; top: 0.15em;
+      width: 1.4rem; height: 1.4rem; line-height: 1.4rem; text-align: center;
+      font-size: 12px; color: var(--blue);
+      background: var(--panel-2); border: 1px solid var(--border); border-radius: 50%;
+    }
+
+  .steps li code { color: var(--cyan); }
+
+  .note { color: var(--muted); font-size: 13px; }
+
+  .cta {
+      display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1rem;
+    }
+
+  .cta a {
+      display: inline-block; text-decoration: none; font-size: 13.5px;
+      padding: 0.55rem 1rem; border-radius: 6px;
+      border: 1px solid var(--border); background: var(--panel);
+      color: var(--dim);
+    }
+
+  .cta a:hover { border-color: var(--blue); color: var(--blue); }
+
+  .cta a.primary { border-color: rgba(122,162,247,0.4); color: var(--blue); }
+
+  footer { margin-top: 3rem; padding-top: 1.4rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 12.5px; }
+
+  footer a:hover { color: var(--blue); }
+
+  @media (max-width: 560px) { body { font-size: 14px; } h1 { font-size: 1.6rem; } }
+</style>
+  <script>(function(){var s=document.createElement("script");var h=location.hostname;s.src=(h==="localhost"||h==="127.0.0.1"?"":"https://tonicbox.dev")+"/nav.js?v=22";s.defer=true;document.head.appendChild(s);})();</script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">tonicbox.dev &middot; challenge</div>
+    <h1><span class="accent">CTF</span> Challenge</h1>
+    <p class="lede">
+      The terminal on the homepage is not a mock-up. It is a complete virtualized computer - a custom
+      32-bit CPU, a kernel, a filesystem, and a full userland - compiled to WebAssembly and running in
+      your browser. Somewhere inside it is a bug. Your job is to exploit it.
+    </p>
+  </header>
+
+  <div class="goal">
+    <div class="label">The goal</div>
+    <p>After logging in, you are an unprivileged user. <strong>Escalate to root and read the flag at <code>/root/flag</code>.</strong></p>
+  </div>
+
+  <section>
+    <h2><span class="n">01</span>What kind of challenge</h2>
+    <p>
+      This is genuine <strong>binary exploitation</strong> - no web tricks, no guessing, no hidden URLs.
+      Everything you need is inside the machine, and the machine fights back. Find what runs as root,
+      work out how it breaks, and turn that into a shell.
+    </p>
+    <p>
+      The entire OS - the shell, the tools, the compiler and assembler - is written in a small
+      self-hosting C dialect (the vulnerable program itself is hand-written TB32 assembly). If you want
+      to understand what you are reversing, the language is documented in
+      <a class="link" href="tbc.html">the TBC language reference</a>, and the instruction set in
+      <a class="link" href="as.html">the TB32 assembly reference</a>.
+    </p>
+  </section>
+
+  <section id="getting-started" style="scroll-margin-top: 4rem;">
+    <h2><span class="n">02</span>Getting started</h2>
+    <ol class="steps list">
+      <li>Open the interactive terminal on the <a class="link" href="/">homepage</a> (desktop only) and log in as <code>tonicbox</code> - the default password (<code>1234</code>) is shown on the login screen. Then type <code>help</code>.</li>
+      <li>Look for something that runs as root: <code>find / -perm -4000</code>.</li>
+      <li>Reverse it - <code>objdump</code>, <code>nm</code>, and <code>ropgadget</code> are already in the box.</li>
+      <li>Leak, compute, exploit. <code>pack</code>, <code>unpack</code>, and <code>calc</code> are there so you never need to leave the terminal.</li>
+      <li><code>cat /root/flag</code>.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2><span class="n">03</span>Notes</h2>
+    <ul class="list">
+      <li><strong>Desktop only.</strong> The interactive terminal needs a real keyboard and pointer; on mobile the homepage falls back to a static view.</li>
+      <li><strong>Fully client-side.</strong> The whole machine runs in your browser. Nothing you type leaves your tab, and there is no server to attack.</li>
+      <li><strong>It is meant to be hard.</strong> Reversing the whole stack is a valid path in itself.</li>
+      <li><strong><a class="link" href="hall.html">Hall of Fame</a>.</strong> Solve it, then message me on Discord (<a class="link" href="https://discordapp.com/users/246089066188111873" target="_blank" rel="noopener">TonicBox</a>) with a short write-up of how you did it to get added.</li>
+    </ul>
+    <div class="cta">
+      <a class="primary" href="/">Open the terminal</a>
+      <a href="arch.html">Architecture &amp; limits</a>
+      <a href="tbc.html">TBC language reference</a>
+      <a href="as.html">TB32 assembly</a>
+      <a href="vi.html">vi editor guide</a>
+      <a href="tbdbg.html">Debugger guide</a>
+    </div>
+  </section>
+
+  <footer>
+    A from-scratch VM, OS, and challenge. Part of <a href="https://tonicbox.dev">tonicbox.dev</a>.
+    <p class="copyright">&copy; 2026 TonicBox</p>
+  </footer>
+
+</div>
+</body>
+</html>

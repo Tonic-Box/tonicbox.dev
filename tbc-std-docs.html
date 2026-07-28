@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TBC standard library - TonicBoxOS</title>
+<meta name="description" content="The TBC prelude: the thin syscall wrappers and __sys intrinsic that make up the entire TonicBoxOS standard library.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230b0e14'/><text x='2' y='12' font-family='monospace' font-size='11' fill='%237aa2f7'>&gt;_</text></svg>">
+<style>
+  html { scroll-behavior: smooth; }
+
+  .wrap { max-width: 860px; margin: 0 auto; }
+
+  header.hero { margin-bottom: 2.75rem; }
+
+  h1 .accent { color: var(--blue); }
+
+  .lede { color: var(--dim); font-size: 15px; max-width: 62ch; }
+
+  .meta { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.1rem; }
+
+  .chip {
+      font-size: 12px; color: var(--muted);
+      border: 1px solid var(--border); border-radius: 999px;
+      padding: 0.2rem 0.7rem; background: var(--panel-2);
+    }
+
+  .chip b { color: var(--dim); font-weight: 600; }
+
+  nav.toc {
+      display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem;
+      padding: 0.9rem 1.1rem; margin-bottom: 2.5rem;
+      background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+      font-size: 13px;
+    }
+
+  nav.toc a { color: var(--dim); text-decoration: none; }
+
+  nav.toc a:hover { color: var(--blue); }
+
+  nav.toc span { color: var(--border); }
+
+  section { margin-bottom: 2.75rem; scroll-margin-top: 1rem; }
+
+  h2 {
+      font-size: 1.25rem; color: #dbe3ff; font-weight: 600;
+      margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);
+    }
+
+  h2 .n { color: var(--muted); font-weight: 400; margin-right: 0.6rem; font-size: 1rem; }
+
+  h3 { font-size: 0.98rem; color: var(--cyan); font-weight: 600; margin: 1.4rem 0 0.5rem; }
+
+  p.tight { margin-bottom: 0.4rem; }
+
+  p a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
+
+  p a:hover { color: var(--cyan); }
+
+  pre {
+      background: var(--panel-2); border: 1px solid var(--border);
+      border-left: 2px solid var(--blue); border-radius: 6px;
+      padding: 1rem 1.15rem; overflow-x: auto; margin: 0.5rem 0 1rem; line-height: 1.6;
+    }
+
+  pre code { background: none; border: none; padding: 0; color: var(--text); font-size: 13px; }
+
+  .kw { color: var(--purple); }
+
+  .ty { color: var(--blue); }
+
+  .str { color: var(--green); }
+
+  .num { color: var(--yellow); }
+
+  .com { color: var(--muted); font-style: italic; }
+
+  .fn { color: var(--cyan); }
+
+  .pp { color: var(--red); }
+
+  ul.list { list-style: none; margin: 0.2rem 0 1rem; }
+
+  ul.list li { position: relative; padding-left: 1.4rem; margin-bottom: 0.45rem; color: var(--dim); }
+
+  ul.list li::before { content: ""; position: absolute; left: 0.15rem; top: 0.66em; width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
+
+  ul.list li strong { color: var(--text); }
+
+  table { width: 100%; border-collapse: collapse; margin: 0.3rem 0 1.1rem; font-size: 13.5px; }
+
+  th, td { text-align: left; padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  td:first-child { color: var(--text); white-space: nowrap; }
+
+  td.desc { color: var(--dim); }
+
+  .tag { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 0.06rem 0.5rem; border-radius: 4px; letter-spacing: 0.02em; }
+
+  .yes { color: var(--green); background: rgba(158, 206, 106, 0.12); border: 1px solid rgba(158,206,106,0.25); }
+
+  .no  { color: var(--red);   background: rgba(247, 118, 142, 0.10); border: 1px solid rgba(247,118,142,0.22); }
+
+  .part{ color: var(--yellow);background: rgba(224, 175, 104, 0.10); border: 1px solid rgba(224,175,104,0.22); }
+
+  .callout {
+      background: rgba(247, 118, 142, 0.05);
+      border: 1px solid rgba(247, 118, 142, 0.22);
+      border-left: 2px solid var(--red);
+      border-radius: 6px; padding: 1rem 1.15rem; margin-bottom: 1.1rem;
+    }
+
+  .callout h3 { margin-top: 0; color: var(--red); }
+
+  .callout p { color: var(--dim); }
+
+  footer { margin-top: 3.5rem; padding-top: 1.4rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 12.5px; }
+
+  footer a:hover { color: var(--blue); }
+
+  @media (max-width: 560px) {
+      body { font-size: 14px; }
+      h1 { font-size: 1.6rem; }
+      nav.toc span { display: none; }
+    }
+</style>
+<script>(function(){var s=document.createElement("script");var h=location.hostname;s.src=(h==="localhost"||h==="127.0.0.1"?"":"https://tonicbox.dev")+"/nav.js?v=22";s.defer=true;document.head.appendChild(s);})();</script>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow">TonicBoxOS &middot; language reference</div>
+    <h1><span class="accent">TBC</span> standard library</h1>
+    <p class="lede">There is no libc. Every program is compiled with this small built-in prelude of thin syscall wrappers, plus the raw <code>__sys</code> intrinsic underneath. That is the entire standard library - anything else you write yourself.</p>
+    <div class="meta"><span class="chip"><b>functions</b> 45</span><span class="chip"><b>source</b> the compiler prelude</span><span class="chip"><a href="/tbc.html">&larr; TBC reference</a></span><span class="chip"><a href="/syscalls.html">syscall reference &rarr;</a></span></div>
+  </header>
+  <nav class="toc">
+    <a href="#i-o-terminal">I/O &amp; terminal</a><span>/</span><a href="#system">System</a><span>/</span><a href="#filesystem">Filesystem</a><span>/</span><a href="#process">Process</a><span>/</span><a href="#identity">Identity</a><span>/</span><a href="#strings">Strings</a><span>/</span><a href="#memory">Memory</a><span>/</span><a href="#processes">Processes</a><span>/</span><a href="#intrinsic">Intrinsic</a>
+  </nav>
+  <section id="i-o-terminal">
+    <h2><span class="n">01</span>I/O &amp; terminal</h2>
+    <h3 id="write"><code>write</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">write</span>(<span class="ty">int</span> fd, <span class="ty">char</span>* buf, <span class="ty">int</span> n)</code></pre>
+    <p>Write <code>n</code> bytes from <code>buf</code> to file descriptor <code>fd</code>.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>fd</code></td><td class="desc">destination descriptor: 1 = stdout, 2 = stderr, 3+ = an open file</td></tr>
+      <tr><td><code>buf</code></td><td class="desc">source buffer</td></tr>
+      <tr><td><code>n</code></td><td class="desc">number of bytes to write</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> the number of bytes written (always <code>n</code>) &nbsp; <span class="tag part">syscall 1</span></p>
+    <h3 id="read"><code>read</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">read</span>(<span class="ty">int</span> fd, <span class="ty">char</span>* buf, <span class="ty">int</span> n)</code></pre>
+    <p>Read up to <code>n</code> bytes from file descriptor <code>fd</code> into <code>buf</code>. On the terminal (<code>fd</code> 0) a line-mode read stops at the newline; in raw mode (see set_raw) it returns keystrokes as they arrive. Blocks until input is available; returns 0 at end of input (Ctrl-D).</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>fd</code></td><td class="desc">source descriptor: 0 = stdin, 3+ = an open file</td></tr>
+      <tr><td><code>buf</code></td><td class="desc">destination buffer</td></tr>
+      <tr><td><code>n</code></td><td class="desc">maximum bytes to read</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> the number of bytes read, or 0 at EOF &nbsp; <span class="tag part">syscall 0</span></p>
+    <h3 id="open"><code>open</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">open</span>(<span class="ty">char</span>* p, <span class="ty">int</span> fl)</code></pre>
+    <p>Open the file at path <code>p</code> and return a descriptor for it.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>p</code></td><td class="desc">absolute or working-directory-relative path</td></tr>
+      <tr><td><code>fl</code></td><td class="desc">flags: 0 = read-only, <code>O_WRONLY</code> 1, <code>O_RDWR</code> 2, <code>O_CREAT</code> 0x40, <code>O_TRUNC</code> 0x200, <code>O_APPEND</code> 0x400 (or them together)</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> a descriptor (&gt;= 3) on success, or a negative errno (-2 no such file, -13 permission denied, -21 is a directory) &nbsp; <span class="tag part">syscall 2</span></p>
+    <h3 id="close"><code>close</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">close</span>(<span class="ty">int</span> fd)</code></pre>
+    <p>Close descriptor <code>fd</code>, releasing it for reuse.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>fd</code></td><td class="desc">the descriptor to close</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> 0 &nbsp; <span class="tag part">syscall 3</span></p>
+    <h3 id="set-raw"><code>set_raw</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">set_raw</span>(<span class="ty">int</span> on)</code></pre>
+    <p>Toggle raw terminal mode. In raw mode <code>read(0, ...)</code> returns individual keystrokes instead of buffering a whole line, which is what full-screen programs like vi need. A child process inherits line mode on exit.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>on</code></td><td class="desc">nonzero to enable raw mode, 0 to return to line mode</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> 0 &nbsp; <span class="tag part">syscall 26</span></p>
+    <h3 id="read-nb"><code>read_nb</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">read_nb</span>(<span class="ty">int</span> fd, <span class="ty">char</span>* buf, <span class="ty">int</span> len)</code></pre>
+    <p>The non-blocking counterpart to <code>read</code>: pull up to <code>len</code> bytes that are already waiting into <code>buf</code>, without ever blocking. Reads the console stdin regardless of <code>fd</code>. Pair it with <code>msleep</code> to drive a responsive game or event loop that never stalls waiting for a key.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>fd</code></td><td class="desc">ignored (the console is always the source)</td></tr>
+      <tr><td><code>buf</code></td><td class="desc">destination buffer</td></tr>
+      <tr><td><code>len</code></td><td class="desc">maximum bytes to read</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> the number of bytes read, or 0 if none are ready &nbsp; <span class="tag part">syscall 78</span></p>
+    <h3 id="ioctl"><code>ioctl</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">ioctl</span>(<span class="ty">int</span> fd, <span class="ty">int</span> req, <span class="ty">char</span>* arg)</code></pre>
+    <p>Device control. On the console tty this queries or sets terminal parameters: <code>req</code> selects the operation (e.g. TIOCGWINSZ <code>0x5413</code> fills a winsize struct, TCGETS <code>0x5401</code> / TCSETS <code>0x5402</code> read/write a termios struct) and <code>arg</code> points to the operation's in/out buffer.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>fd</code></td><td class="desc">the descriptor (0/1/2 = the console tty)</td></tr>
+      <tr><td><code>req</code></td><td class="desc">the request code</td></tr>
+      <tr><td><code>arg</code></td><td class="desc">pointer to the request's argument buffer</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> the driver-defined result, or -25 (ENOTTY) on a non-device &nbsp; <span class="tag part">syscall 72</span></p>
+  </section>
+  <section id="system">
+    <h2><span class="n">02</span>System</h2>
+    <h3 id="msleep"><code>msleep</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">msleep</span>(<span class="ty">int</span> ms)</code></pre>
+    <p>Sleep for <code>ms</code> milliseconds of real time, then return. Millisecond pacing for animation and real-time loops; combine with <code>read_nb</code> for a loop that ticks on a fixed clock while still reacting to input.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>ms</code></td><td class="desc">milliseconds to sleep</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> 0 once the interval has elapsed &nbsp; <span class="tag part">syscall 73</span></p>
+    <h3 id="getrandom"><code>getrandom</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">getrandom</span>(<span class="ty">int</span>* p, <span class="ty">int</span> n)</code></pre>
+    <p>Fill <code>p</code> with <code>n</code> random bytes from the userland PRNG. Suitable for games and general randomness; it is not the cryptographic source behind ASLR.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>p</code></td><td class="desc">buffer to fill</td></tr>
+      <tr><td><code>n</code></td><td class="desc">number of bytes to write</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> 0 &nbsp; <span class="tag part">syscall 28</span></p>
+  </section>
+  <section id="filesystem">
+    <h2><span class="n">03</span>Filesystem</h2>
+    <h3 id="stat"><code>stat</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">stat</span>(<span class="ty">char</span>* p, <span class="ty">char</span>* buf)</code></pre>
+    <p>Fill <code>buf</code> with metadata about path <code>p</code>: five little-endian <code>int</code> fields laid out as mode@0, uid@4, size@8, type@12 (1 = file, 2 = directory), gid@16.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>p</code></td><td class="desc">path to inspect</td></tr>
+      <tr><td><code>buf</code></td><td class="desc">a 20-byte buffer for the five fields</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> 0 on success, or -2 if <code>p</code> does not exist &nbsp; <span class="tag part">syscall 5</span></p>
+    <h3 id="listdir"><code>listdir</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">listdir</span>(<span class="ty">char</span>* p, <span class="ty">char</span>* b, <span class="ty">int</span> n)</code></pre>
+    <p>List directory <code>p</code>, writing its entry names newline-separated into <code>b</code>.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>p</code></td><td class="desc">directory path</td></tr>
+      <tr><td><code>b</code></td><td class="desc">destination buffer</td></tr>
+      <tr><td><code>n</code></td><td class="desc">capacity of <code>b</code> in bytes</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> the number of bytes written, or -2 if <code>p</code> is not a directory &nbsp; <span class="tag part">syscall 7</span></p>
+    <h3 id="getcwd"><code>getcwd</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">getcwd</span>(<span class="ty">char</span>* b, <span class="ty">int</span> n)</code></pre>
+    <p>Copy the current working directory into <code>b</code>.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>b</code></td><td class="desc">destination buffer</td></tr>
+      <tr><td><code>n</code></td><td class="desc">capacity of <code>b</code> in bytes</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> the length copied &nbsp; <span class="tag part">syscall 9</span></p>
+    <h3 id="chdir"><code>chdir</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">chdir</span>(<span class="ty">char</span>* p)</code></pre>
+    <p>Change the current working directory to <code>p</code>.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>p</code></td><td class="desc">target directory</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> 0 on success, or a negative errno &nbsp; <span class="tag part">syscall 25</span></p>
+    <h3 id="unlink"><code>unlink</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">unlink</span>(<span class="ty">char</span>* p)</code></pre>
+    <p>Remove the file at path <code>p</code>.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>p</code></td><td class="desc">file to remove</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> 0 on success, or a negative errno &nbsp; <span class="tag part">syscall 15</span></p>
+    <h3 id="mkdir"><code>mkdir</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">mkdir</span>(<span class="ty">char</span>* p, <span class="ty">int</span> m)</code></pre>
+    <p>Create directory <code>p</code> with permission bits <code>m</code>.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>p</code></td><td class="desc">new directory path</td></tr>
+      <tr><td><code>m</code></td><td class="desc">octal permission bits, e.g. <code>0755</code></td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> 0 on success, or a negative errno &nbsp; <span class="tag part">syscall 16</span></p>
+    <h3 id="rmdir"><code>rmdir</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">rmdir</span>(<span class="ty">char</span>* p)</code></pre>
+    <p>Remove the empty directory at path <code>p</code>.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>p</code></td><td class="desc">directory to remove</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> 0 on success, or a negative errno &nbsp; <span class="tag part">syscall 17</span></p>
+    <h3 id="rename"><code>rename</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">rename</span>(<span class="ty">char</span>* a, <span class="ty">char</span>* b)</code></pre>
+    <p>Rename path <code>a</code> to path <code>b</code>.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>a</code></td><td class="desc">existing path</td></tr>
+      <tr><td><code>b</code></td><td class="desc">new path</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> 0 on success, or a negative errno &nbsp; <span class="tag part">syscall 18</span></p>
+    <h3 id="chmod"><code>chmod</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">chmod</span>(<span class="ty">char</span>* p, <span class="ty">int</span> m)</code></pre>
+    <p>Set the permission bits of path <code>p</code> to <code>m</code>.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>p</code></td><td class="desc">path to modify</td></tr>
+      <tr><td><code>m</code></td><td class="desc">octal permission bits, e.g. <code>0644</code></td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> 0 on success, or a negative errno &nbsp; <span class="tag part">syscall 19</span></p>
+    <h3 id="chown"><code>chown</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">chown</span>(<span class="ty">char</span>* p, <span class="ty">int</span> u)</code></pre>
+    <p>Set the owner user id of path <code>p</code> to <code>u</code>.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>p</code></td><td class="desc">path to modify</td></tr>
+      <tr><td><code>u</code></td><td class="desc">new owner uid</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> 0 on success, or a negative errno &nbsp; <span class="tag part">syscall 23</span></p>
+  </section>
+  <section id="process">
+    <h2><span class="n">04</span>Process</h2>
+    <h3 id="srun"><code>srun</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">srun</span>(<span class="ty">int</span> c, <span class="ty">int</span> v)</code></pre>
+    <p>Run one already-expanded command as a foreground child and wait for it: a fused fork + exec + wait that returns the child's exit code. <code>v</code> is an array of <code>char*</code> argument addresses (<code>v[0]</code> is the path); set-user-ID / set-group-ID bits on the target are honored. It does no I/O plumbing of its own - real redirection uses <code>fork</code> + <code>pipe</code> + <code>dup2</code> (all in this prelude); <code>cc</code> uses <code>srun</code> to invoke the assembler.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>c</code></td><td class="desc">argument count (argc)</td></tr>
+      <tr><td><code>v</code></td><td class="desc">argument vector: the address of an array of <code>char*</code> (argv)</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> the child's exit code &nbsp; <span class="tag part">syscall 24</span></p>
+    <h3 id="exit"><code>exit</code></h3>
+    <pre><code><span class="ty">void</span> <span class="fn">exit</span>(<span class="ty">int</span> c)</code></pre>
+    <p>Terminate the current process with status <code>c</code>. Does not return.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>c</code></td><td class="desc">exit status</td></tr>
+    </table>
+    <p class="tight"><span class="tag part">syscall 11</span></p>
+  </section>
+  <section id="identity">
+    <h2><span class="n">05</span>Identity</h2>
+    <h3 id="getuid"><code>getuid</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">getuid</span>()</code></pre>
+    <p>Return the real user id of the current process.</p>
+    <p class="tight"><strong>Returns</strong> the real uid &nbsp; <span class="tag part">syscall 13</span></p>
+    <h3 id="geteuid"><code>geteuid</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">geteuid</span>()</code></pre>
+    <p>Return the effective user id, which differs from the real uid while a setuid program is running (this is what the guestbook exploit escalates).</p>
+    <p class="tight"><strong>Returns</strong> the effective uid &nbsp; <span class="tag part">syscall 14</span></p>
+  </section>
+  <section id="strings">
+    <h2><span class="n">06</span>Strings</h2>
+    <h3 id="strlen"><code>strlen</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">strlen</span>(<span class="ty">char</span>* s)</code></pre>
+    <p>Return the length of the NUL-terminated string <code>s</code>. This is the only prelude function that is pure TBC rather than a syscall wrapper.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>s</code></td><td class="desc">a NUL-terminated string</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> the number of bytes before the terminating NUL</p>
+    <h3 id="strcmp"><code>strcmp</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">strcmp</span>(<span class="ty">char</span>* a, <span class="ty">char</span>* b)</code></pre>
+    <p>Compare two NUL-terminated strings. Returns 0 if equal, otherwise the signed difference of the first differing byte (compared as unsigned char).</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>a</code></td><td class="desc">first string</td></tr>
+      <tr><td><code>b</code></td><td class="desc">second string</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> 0 if equal, else first differing byte difference</p>
+    <h3 id="strncmp"><code>strncmp</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">strncmp</span>(<span class="ty">char</span>* a, <span class="ty">char</span>* b, <span class="ty">int</span> n)</code></pre>
+    <p>Like <code>strcmp</code> but compares at most <code>n</code> bytes.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>a</code></td><td class="desc">first string</td></tr>
+      <tr><td><code>b</code></td><td class="desc">second string</td></tr>
+      <tr><td><code>n</code></td><td class="desc">maximum number of bytes to compare</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> 0 if equal within <code>n</code> bytes, else first differing byte difference</p>
+    <h3 id="strcpy"><code>strcpy</code></h3>
+    <pre><code><span class="ty">char</span>* <span class="fn">strcpy</span>(<span class="ty">char</span>* d, <span class="ty">char</span>* s)</code></pre>
+    <p>Copy the NUL-terminated string <code>s</code> (including the terminator) into <code>d</code>. Returns <code>d</code>.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>d</code></td><td class="desc">destination buffer (must be large enough)</td></tr>
+      <tr><td><code>s</code></td><td class="desc">source string</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> <code>d</code></p>
+    <h3 id="strcat"><code>strcat</code></h3>
+    <pre><code><span class="ty">char</span>* <span class="fn">strcat</span>(<span class="ty">char</span>* d, <span class="ty">char</span>* s)</code></pre>
+    <p>Append the NUL-terminated string <code>s</code> to the end of <code>d</code>. Returns <code>d</code>.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>d</code></td><td class="desc">destination string (must have room for the result)</td></tr>
+      <tr><td><code>s</code></td><td class="desc">string to append</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> <code>d</code></p>
+    <h3 id="strchr"><code>strchr</code></h3>
+    <pre><code><span class="ty">char</span>* <span class="fn">strchr</span>(<span class="ty">char</span>* s, <span class="ty">int</span> c)</code></pre>
+    <p>Find the first occurrence of byte <code>c</code> in the NUL-terminated string <code>s</code>. Returns a pointer to it, or 0 if not found; searching for 0 returns the terminator.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>s</code></td><td class="desc">string to search</td></tr>
+      <tr><td><code>c</code></td><td class="desc">byte to find (low 8 bits used)</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> pointer to the first match, or 0</p>
+  </section>
+  <section id="memory">
+    <h2><span class="n">07</span>Memory</h2>
+    <h3 id="memcpy"><code>memcpy</code></h3>
+    <pre><code><span class="ty">char</span>* <span class="fn">memcpy</span>(<span class="ty">char</span>* d, <span class="ty">char</span>* s, <span class="ty">int</span> n)</code></pre>
+    <p>Copy <code>n</code> bytes from <code>s</code> to <code>d</code> (the regions must not overlap). Returns <code>d</code>.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>d</code></td><td class="desc">destination buffer</td></tr>
+      <tr><td><code>s</code></td><td class="desc">source buffer</td></tr>
+      <tr><td><code>n</code></td><td class="desc">number of bytes to copy</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> <code>d</code></p>
+    <h3 id="memset"><code>memset</code></h3>
+    <pre><code><span class="ty">char</span>* <span class="fn">memset</span>(<span class="ty">char</span>* d, <span class="ty">int</span> c, <span class="ty">int</span> n)</code></pre>
+    <p>Fill the first <code>n</code> bytes of <code>d</code> with the byte value <code>c</code>. Returns <code>d</code>.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>d</code></td><td class="desc">destination buffer</td></tr>
+      <tr><td><code>c</code></td><td class="desc">fill byte (low 8 bits used)</td></tr>
+      <tr><td><code>n</code></td><td class="desc">number of bytes to set</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> <code>d</code></p>
+    <h3 id="memcmp"><code>memcmp</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">memcmp</span>(<span class="ty">char</span>* a, <span class="ty">char</span>* b, <span class="ty">int</span> n)</code></pre>
+    <p>Compare the first <code>n</code> bytes of <code>a</code> and <code>b</code>. Returns 0 if equal, otherwise the signed difference of the first differing byte (compared as unsigned char).</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>a</code></td><td class="desc">first buffer</td></tr>
+      <tr><td><code>b</code></td><td class="desc">second buffer</td></tr>
+      <tr><td><code>n</code></td><td class="desc">number of bytes to compare</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> 0 if equal, else first differing byte difference</p>
+    <h3 id="sbrk"><code>sbrk</code></h3>
+    <pre><code><span class="ty">char</span>* <span class="fn">sbrk</span>(<span class="ty">int</span> d)</code></pre>
+    <p>Grow (or query) the program break, the top of the heap. <code>sbrk(0)</code> returns the current break without moving it; a positive delta grows the heap upward and returns the *previous* break (the base of the freshly reserved region). The heap grows until it would collide with the stack, then returns <code>(char*)-1</code>.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>d</code></td><td class="desc">bytes to move the break by (0 to query)</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> the previous break, or <code>(char*)-1</code> on failure</p>
+    <h3 id="malloc"><code>malloc</code></h3>
+    <pre><code><span class="ty">char</span>* <span class="fn">malloc</span>(<span class="ty">int</span> n)</code></pre>
+    <p>Allocate <code>n</code> bytes from the heap and return a pointer to them, or 0 if the heap cannot grow far enough. Blocks carry a small header, are reused once freed, and adjacent free blocks are coalesced; the heap is grown on demand via <code>sbrk</code> only when no existing free block fits.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>n</code></td><td class="desc">number of bytes to allocate</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> pointer to the allocation, or 0 on failure</p>
+    <h3 id="free"><code>free</code></h3>
+    <pre><code><span class="ty">void</span> <span class="fn">free</span>(<span class="ty">char</span>* p)</code></pre>
+    <p>Release a <code>malloc</code>'d allocation so its space can be reused. The block is marked free and merged with any adjacent free blocks on the next <code>malloc</code>. Passing 0 is a no-op.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>p</code></td><td class="desc">a pointer previously returned by <code>malloc</code>, or 0</td></tr>
+    </table>
+  </section>
+  <section id="processes">
+    <h2><span class="n">08</span>Processes</h2>
+    <h3 id="fork"><code>fork</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">fork</span>()</code></pre>
+    <p>Create a child process: a near-duplicate of the caller with its own copy of memory. Open file descriptors (and pipe ends) are inherited. <code>fork</code> returns twice - the new child's PID in the parent and 0 in the child - so the two branches can follow different paths.</p>
+    <p class="tight"><strong>Returns</strong> child PID to the parent, 0 to the child, or -EAGAIN if the table is full</p>
+    <h3 id="getpid"><code>getpid</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">getpid</span>()</code></pre>
+    <p>The caller's own process id.</p>
+    <p class="tight"><strong>Returns</strong> the current PID</p>
+    <h3 id="getppid"><code>getppid</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">getppid</span>()</code></pre>
+    <p>The parent's process id (the process that fork()ed this one, or 1 once an orphan has been reparented to init).</p>
+    <p class="tight"><strong>Returns</strong> the parent PID</p>
+    <h3 id="waitpid"><code>waitpid</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">waitpid</span>(<span class="ty">int</span> pid, <span class="ty">int</span> st, <span class="ty">int</span> opt)</code></pre>
+    <p>Wait for a child to change state and optionally collect its exit status. <code>pid</code> -1 waits for any child; a positive <code>pid</code> waits for that specific child. Pass the address of an int in <code>st</code> to receive the status word (or 0 to ignore it).</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>pid</code></td><td class="desc">child to wait for (-1 = any child)</td></tr>
+      <tr><td><code>st</code></td><td class="desc">address of an int to receive the status, or 0</td></tr>
+      <tr><td><code>opt</code></td><td class="desc">option bits (1 = WNOHANG: don't block; 4 = WUNTRACED: also report stops)</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> the reaped child's PID, 0 (WNOHANG and none ready), or -ECHILD</p>
+    <h3 id="pipe"><code>pipe</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">pipe</span>(<span class="ty">int</span> fds)</code></pre>
+    <p>Create a unidirectional pipe. Fills the two-int array <code>fds</code> with a read end in <code>fds[0]</code> and a write end in <code>fds[1]</code>; bytes written to the write end are read back, in order, from the read end. With fork() + dup2() this wires one process's output into another's input.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>fds</code></td><td class="desc">a two-int array that receives { read_fd, write_fd }</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> 0 on success, or a negative error</p>
+    <h3 id="dup"><code>dup</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">dup</span>(<span class="ty">int</span> fd)</code></pre>
+    <p>Duplicate an open file descriptor onto the lowest free descriptor (&gt;= 3). The copy shares the same open-file description - and thus the seek offset - as <code>fd</code>.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>fd</code></td><td class="desc">the descriptor to duplicate</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> the new descriptor, or a negative error</p>
+    <h3 id="dup2"><code>dup2</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">dup2</span>(<span class="ty">int</span> of, <span class="ty">int</span> nf)</code></pre>
+    <p>Make <code>nf</code> refer to whatever <code>of</code> refers to, closing <code>nf</code> first if it was open. The classic way to point a child's stdin/stdout/stderr (fd 0/1/2) at a pipe or file just before exec.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>of</code></td><td class="desc">the source descriptor</td></tr>
+      <tr><td><code>nf</code></td><td class="desc">the descriptor to overwrite (commonly 0, 1, or 2)</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> nf on success, or a negative error</p>
+    <h3 id="execve"><code>execve</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">execve</span>(<span class="ty">char</span>* p)</code></pre>
+    <p>Replace the current process image with the program at path <code>p</code>, keeping the caller's credentials and open descriptors. On success it does not return - the new program takes over the process.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>p</code></td><td class="desc">path to the executable</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> does not return on success; a negative error otherwise</p>
+    <h3 id="execvp"><code>execvp</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">execvp</span>(<span class="ty">char</span>* p, <span class="ty">int</span> v, <span class="ty">int</span> n)</code></pre>
+    <p>Replace the current process image with program <code>p</code>, resolving a bare name against PATH and passing an explicit argument vector. Honors the target's set-user-ID / set-group-ID bits. On success it does not return.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>p</code></td><td class="desc">path or command name to execute</td></tr>
+      <tr><td><code>v</code></td><td class="desc">argv: an array of <code>n</code> string pointers (v[0] is the program name)</td></tr>
+      <tr><td><code>n</code></td><td class="desc">the number of arguments in <code>v</code></td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> does not return on success; a negative error otherwise</p>
+    <h3 id="kill"><code>kill</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">kill</span>(<span class="ty">int</span> pid, <span class="ty">int</span> sig)</code></pre>
+    <p>Send signal <code>sig</code> to a process or process group. A positive <code>pid</code> targets that process, <code>pid</code> 0 the caller's group, and a negative <code>pid</code> the group <code>-pid</code>. Delivery obeys the usual permission rule (same user, or root).</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>pid</code></td><td class="desc">target process (&gt;0), the caller's group (0), or group -pid (&lt;0)</td></tr>
+      <tr><td><code>sig</code></td><td class="desc">the signal number to deliver</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> 0 on success, or a negative error (-EPERM / -ESRCH)</p>
+  </section>
+  <section id="intrinsic">
+    <h2><span class="n">09</span>Intrinsic</h2>
+    <h3 id="sys"><code>__sys</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">__sys</span>(<span class="ty">int</span> num, <span class="ty">int</span> a, <span class="ty">int</span> b, <span class="ty">int</span> c, <span class="ty">int</span> d, <span class="ty">int</span> e, <span class="ty">int</span> f)</code></pre>
+    <p>The raw system-call intrinsic that every wrapper above is built on. <code>num</code> selects the call (loaded into r7); up to six arguments go in r1..r6 and the result comes back in r1. Use it to reach syscalls the prelude does not wrap - the syscall reference (linked above) lists every number and its signature.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>num</code></td><td class="desc">the syscall number</td></tr>
+      <tr><td><code>a..f</code></td><td class="desc">up to six integer/pointer arguments</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> the syscall's result &nbsp; <span class="tag no">intrinsic</span></p>
+  </section>
+  <footer>
+    The TBC prelude - the whole standard library of <a href="https://tonicbox.dev">TonicBoxOS</a>. See the <a href="/tbc.html">language reference</a>.
+  </footer>
+</div>
+</body>
+</html>
