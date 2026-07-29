@@ -312,7 +312,12 @@
     if (k === "Enter") { e.preventDefault(); onEnter(mode); return; }
     if (k === "Backspace") { e.preventDefault(); if (mode === "shell") shadow = shadow.slice(0, -1); send([127]); return; }
     if (k === "Tab") { e.preventDefault(); return; }
-    if (k === "Escape") { e.preventDefault(); send([27]); return; }
+    if (k === "Escape") {
+      e.preventDefault();
+      if (mode === "shell" && terminalEl && terminalEl.classList.contains("maximized")) { setMaximized(false); return; }
+      send([27]);
+      return;
+    }
     if (e.ctrlKey && k.length === 1) {
       e.preventDefault();
       var lc = k.toLowerCase();
@@ -534,15 +539,41 @@
     if (wasm && wasm.set_winsize) wasm.set_winsize(ROWS, COLS);
     if (live) render();
   }
+  var maxBtn = null;
+  function applyMaxState() {
+    var on = terminalEl && terminalEl.classList.contains("maximized");
+    if (maxBtn) {
+      maxBtn.textContent = on ? "⤡" : "⤢";
+      maxBtn.setAttribute("title", on ? "Restore terminal (Esc)" : "Maximize terminal");
+    }
+    if (greenDot) greenDot.setAttribute("title", on ? "restore" : "maximize");
+  }
+  function setMaximized(on) {
+    if (!terminalEl) return;
+    terminalEl.classList.toggle("maximized", on);
+    applyMaxState();
+    scrollBottom();
+    requestAnimationFrame(function () { syncWinsize(true); });
+  }
+  function toggleMaximized() {
+    setMaximized(!(terminalEl && terminalEl.classList.contains("maximized")));
+  }
   function wireMaximize() {
-    if (!greenDot || !terminalEl) return;
-    greenDot.style.cursor = "pointer";
-    greenDot.setAttribute("title", "maximize / restore");
-    greenDot.addEventListener("click", function () {
-      terminalEl.classList.toggle("maximized");
-      scrollBottom();
-      requestAnimationFrame(function () { syncWinsize(true); });
-    });
+    if (!terminalEl) return;
+    var tb = document.querySelector(".titlebar");
+    if (tb) {
+      maxBtn = document.createElement("span");
+      maxBtn.style.cssText = "margin-left:auto;cursor:pointer;font-size:14px;line-height:1;user-select:none;color:#565f89;";
+      maxBtn.addEventListener("mouseover", function () { maxBtn.style.color = "#7aa2f7"; });
+      maxBtn.addEventListener("mouseout", function () { maxBtn.style.color = "#565f89"; });
+      maxBtn.addEventListener("click", toggleMaximized);
+      tb.appendChild(maxBtn);
+    }
+    if (greenDot) {
+      greenDot.style.cursor = "pointer";
+      greenDot.addEventListener("click", toggleMaximized);
+    }
+    applyMaxState();
     var rzT = null;
     window.addEventListener("resize", function () {
       if (rzT) clearTimeout(rzT);
@@ -636,7 +667,7 @@
     if (!tb) return;
 
     var rb = document.createElement("span");
-    rb.style.cssText = "margin-left:auto;cursor:pointer;font-size:12px;user-select:none;color:#565f89;";
+    rb.style.cssText = "margin-left:14px;cursor:pointer;font-size:12px;user-select:none;color:#565f89;";
     rb.textContent = "reboot";
     rb.setAttribute("title", "Restart the machine (reseeds ASLR; persisted files survive).");
     rb.addEventListener("mouseover", function () { rb.style.color = "#7aa2f7"; });
