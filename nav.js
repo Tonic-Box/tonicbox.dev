@@ -162,7 +162,7 @@
     var subBlog = host.indexOf("blog.") === 0;
     var onPortfolio = subPortfolio || path.indexOf("/portfolio") === 0;
     var onBlog = subBlog || path.indexOf("/blog") === 0;
-    var onCtf = /\/(ctf|tbc|sh|vi|tbdbg|as|arch|syscalls|tbc-std-docs|hall)\.html$/.test(location.pathname);
+    var onCtf = /\/(ctf|tbc|sh|vi|tbdbg|as|arch|syscalls|tbc-std-docs)\.html$/.test(location.pathname);
     var onHall = /\/hall\.html$/.test(location.pathname);
     var onHome = !subPortfolio && !subBlog && !onPortfolio && !onBlog && !onCtf && !onHall && (path === "/" || path === "");
     if (onHome) { brand.classList.add("active"); homeItem.classList.add("active"); }

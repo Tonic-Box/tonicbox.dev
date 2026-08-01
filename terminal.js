@@ -66,10 +66,11 @@
   }
 
   function cellClass(row, c) {
-    if (row.a[c] & 1) return "vt-rev";
-    var cls = "";
-    if (row.f[c]) cls = "vt-fg-" + row.f[c];
-    if (row.b[c]) cls = cls ? cls + " vt-bg-" + row.b[c] : "vt-bg-" + row.b[c];
+    var f = row.f[c], b = row.b[c], a = row.a[c], cls = "";
+    if (a & 1) { var t = f; f = b; b = t; if (!f && !b) return (a & 2) ? "vt-rev vt-bold" : "vt-rev"; }
+    if (f) cls = "vt-fg-" + f;
+    if (b) cls = cls ? cls + " vt-bg-" + b : "vt-bg-" + b;
+    if (a & 2) cls = cls ? cls + " vt-bold" : "vt-bold";
     return cls;
   }
 
@@ -122,6 +123,11 @@
     lastVt = null;
     outputEl.style.display = "";
     var end = cur.r, html = "";
+    for (var rr = vp.length - 1; rr > end; rr--) {
+      var rw = vp[rr], has = false;
+      for (var cx = 0; cx < rw.c.length; cx++) { if (rw.c[cx] !== " " || rw.a[cx] || rw.f[cx] || rw.b[cx]) { has = true; break; } }
+      if (has) { end = rr; break; }
+    }
     for (var r2 = 0; r2 <= end; r2++) {
       html += rowHtml(vp[r2], (cur.visible && r2 === cur.r) ? cur.c : null);
       if (r2 < end) html += "\n";
@@ -275,7 +281,7 @@
     if (k === "PageDown") return [27, 91, 54, 126];
     if (k === "Insert") return [27, 91, 50, 126];
     if (k === "Delete") return [27, 91, 51, 126];
-    if (k.length === 1) return [e.ctrlKey ? (k.charCodeAt(0) & 0x1f) : k.charCodeAt(0)];
+    if (k.length === 1) return [(e.ctrlKey && !e.altKey) ? (k.charCodeAt(0) & 0x1f) : k.charCodeAt(0)];
     return null;
   }
 
@@ -318,7 +324,7 @@
       send([27]);
       return;
     }
-    if (e.ctrlKey && k.length === 1) {
+    if (e.ctrlKey && !e.altKey && k.length === 1) {
       e.preventDefault();
       var lc = k.toLowerCase();
       if (lc === "l") { clearScreen(); return; }

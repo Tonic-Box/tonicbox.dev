@@ -5,6 +5,13 @@
   "use strict";
 
   function pal16(i) { return i === 15 ? 231 : i + 1; }
+  // map a 24-bit colour to the nearest xterm-256 palette index (the renderer works
+  // in palette indices, so imported truecolour output shows an approximate colour).
+  function rgbTo256(r, g, b) {
+    if (r === g && g === b) { if (r < 8) return 16; if (r > 248) return 231; return 232 + Math.round((r - 8) / 247 * 24); }
+    var ri = Math.round(r / 255 * 5), gi = Math.round(g / 255 * 5), bi = Math.round(b / 255 * 5);
+    return 16 + 36 * ri + 6 * gi + bi;
+  }
 
   function createTerminal(cols, rows, opts) {
     var COLS = cols || 80, ROWS = rows || 24;
@@ -15,6 +22,7 @@
     var normal = mkScreen(), alt = mkScreen();
     var scr = normal, altOn = false;
     var cr = 0, cc = 0, cfg = 0, cbg = 0, cattr = 0, cvis = true;
+    var scrollTop = 0, scrollBot = ROWS - 1;
     var savedR = 0, savedC = 0, savedFg = 0, savedBg = 0, savedAttr = 0;
     var altSaveR = 0, altSaveC = 0, altSaveFg = 0, altSaveBg = 0, altSaveAttr = 0;
     var pend = "";
@@ -25,13 +33,29 @@
     function clearRow(r) { var row = scr[r]; for (var x = 0; x < COLS; x++) { row.c[x] = " "; row.f[x] = 0; row.b[x] = 0; row.a[x] = 0; } }
     function clearScreen() { for (var r = 0; r < ROWS; r++) clearRow(r); }
 
+    // scroll the region [top,bot] up by n lines (blank rows enter at the bottom);
+    // when the region starts at row 0 on the normal screen, evicted lines join the
+    // scrollback, matching a plain line feed.
+    function scrollRegionUp(top, bot, n) {
+      for (var k = 0; k < n; k++) {
+        var gone = scr[top];
+        for (var r = top; r < bot; r++) scr[r] = scr[r + 1];
+        scr[bot] = blankRow();
+        if (!altOn && top === 0) { scroll.push(gone); if (scroll.length > MAXSCROLL) { scroll.shift(); if (freshFrom > 0) freshFrom--; } }
+      }
+    }
+    function scrollRegionDown(top, bot, n) {
+      for (var k = 0; k < n; k++) {
+        for (var r = bot; r > top; r--) scr[r] = scr[r - 1];
+        scr[top] = blankRow();
+      }
+    }
+    function insChars(n) { var row = scr[cr]; for (var c = COLS - 1; c >= cc + n; c--) { row.c[c] = row.c[c - n]; row.f[c] = row.f[c - n]; row.b[c] = row.b[c - n]; row.a[c] = row.a[c - n]; } for (var c2 = cc; c2 < cc + n && c2 < COLS; c2++) { row.c[c2] = " "; row.f[c2] = 0; row.b[c2] = 0; row.a[c2] = 0; } }
+    function delChars(n) { var row = scr[cr]; for (var c = cc; c < COLS; c++) { if (c + n < COLS) { row.c[c] = row.c[c + n]; row.f[c] = row.f[c + n]; row.b[c] = row.b[c + n]; row.a[c] = row.a[c + n]; } else { row.c[c] = " "; row.f[c] = 0; row.b[c] = 0; row.a[c] = 0; } } }
+    function eraseChars(n) { var row = scr[cr]; for (var c = cc; c < cc + n && c < COLS; c++) { row.c[c] = " "; row.f[c] = 0; row.b[c] = 0; row.a[c] = 0; } }
     function lineFeed() {
-      cr++;
-      if (cr < ROWS) return;
-      cr = ROWS - 1;
-      var top = scr.shift();
-      scr.push(blankRow());
-      if (!altOn) { scroll.push(top); if (scroll.length > MAXSCROLL) { scroll.shift(); if (freshFrom > 0) freshFrom--; } }
+      if (cr === scrollBot) { scrollRegionUp(scrollTop, scrollBot, 1); return; }
+      if (cr < ROWS - 1) cr++;
     }
     function putc(chr) {
       if (cc >= COLS) { cc = 0; lineFeed(); }
@@ -60,7 +84,7 @@
         else if (n === 38 || n === 48) {
 
           if (p[i + 1] === "5") { var idx = parseInt(p[i + 2], 10) || 0; var v = idx < 16 ? pal16(idx) : idx; if (n === 38) cfg = v; else cbg = v; i += 2; }
-          else if (p[i + 1] === "2") i += 4;
+          else if (p[i + 1] === "2") { var v2 = rgbTo256(parseInt(p[i + 2], 10) || 0, parseInt(p[i + 3], 10) || 0, parseInt(p[i + 4], 10) || 0); if (n === 38) cfg = v2; else cbg = v2; i += 4; }
         }
         else if (n === 39) cfg = 0;
         else if (n === 49) cbg = 0;
@@ -97,7 +121,14 @@
       else if (cmd === "J") eraseDisplay(n0);
       else if (cmd === "K") eraseLine(n0);
       else if (cmd === "m") sgr(p);
-
+      else if (cmd === "L") { if (cr >= scrollTop && cr <= scrollBot) scrollRegionDown(cr, scrollBot, n0 || 1); }
+      else if (cmd === "M") { if (cr >= scrollTop && cr <= scrollBot) scrollRegionUp(cr, scrollBot, n0 || 1); }
+      else if (cmd === "@") insChars(n0 || 1);
+      else if (cmd === "P") delChars(n0 || 1);
+      else if (cmd === "X") eraseChars(n0 || 1);
+      else if (cmd === "S") scrollRegionUp(scrollTop, scrollBot, n0 || 1);
+      else if (cmd === "T") scrollRegionDown(scrollTop, scrollBot, n0 || 1);
+      else if (cmd === "r") { var t = (parseInt(p[0], 10) || 1) - 1, bt = (parseInt(p[1], 10) || ROWS) - 1; if (t < 0) t = 0; if (bt > ROWS - 1) bt = ROWS - 1; if (t < bt) { scrollTop = t; scrollBot = bt; cr = 0; cc = 0; } }
     }
 
     function write(s) {
@@ -125,6 +156,9 @@
             if (onOsc) onOsc(s.slice(i + 2, k));
             i = (s.charCodeAt(k) === 7) ? k + 1 : k; continue;
           }
+          if (n1 === "D") { if (cr === scrollBot) scrollRegionUp(scrollTop, scrollBot, 1); else if (cr < ROWS - 1) cr++; i += 2; continue; }
+          if (n1 === "M") { if (cr === scrollTop) scrollRegionDown(scrollTop, scrollBot, 1); else if (cr > 0) cr--; i += 2; continue; }
+          if (n1 === "E") { cc = 0; if (cr === scrollBot) scrollRegionUp(scrollTop, scrollBot, 1); else if (cr < ROWS - 1) cr++; i += 2; continue; }
           i += 2; continue;
         }
         if (ch === 13) { cc = 0; i++; }
@@ -148,6 +182,7 @@
       var shedN = (nr < oR && normCur >= nr) ? normCur - nr + 1 : 0;
       var shedA = (altOn && nr < oR && cr >= nr) ? cr - nr + 1 : 0;
       COLS = nc; ROWS = nr;
+      scrollTop = 0; scrollBot = ROWS - 1;
       normal = mkScreen(); alt = mkScreen();
       for (var s = 0; s < shedN; s++) {
         scroll.push(oldN[s]);
@@ -172,7 +207,7 @@
       while (r <= end) { scroll.push(scr[r]); if (scroll.length > MAXSCROLL) { scroll.shift(); if (freshFrom > 0) freshFrom--; } r++; }
       normal = mkScreen(); scr = normal; cr = 0; cc = 0;
     }
-    function reset() { scroll = []; freshFrom = 0; normal = mkScreen(); alt = mkScreen(); scr = normal; altOn = false; cr = 0; cc = 0; cfg = 0; cbg = 0; cattr = 0; cvis = true; pend = ""; }
+    function reset() { scroll = []; freshFrom = 0; normal = mkScreen(); alt = mkScreen(); scr = normal; altOn = false; cr = 0; cc = 0; cfg = 0; cbg = 0; cattr = 0; cvis = true; pend = ""; scrollTop = 0; scrollBot = ROWS - 1; }
 
     function dropScrollback() { scroll = []; freshFrom = 0; }
 
