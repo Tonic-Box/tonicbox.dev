@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Changelog - TonicBoxOS</title>
+<meta name="description" content="What's new in TonicBoxOS: features, improvements, and fixes, newest first.">
+<link rel="canonical" href="https://tonicbox.dev/changelog.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230b0e14'/><text x='2' y='12' font-family='monospace' font-size='11' fill='%237aa2f7'>&gt;_</text></svg>">
+<link rel="stylesheet" href="docs.css?v=1">
+<style>
+  .wrap { max-width: 760px; margin: 0 auto; }
+
+  header.hero { margin-bottom: 2.75rem; }
+
+  h1 .accent { color: var(--yellow); }
+
+  .lede { color: var(--dim); font-size: 15px; max-width: 62ch; }
+
+  .log { border-left: 2px solid var(--border); margin-left: 6px; }
+
+  .entry { position: relative; padding: 0 0 2.5rem 1.75rem; }
+
+  .entry::before {
+      content: ""; position: absolute; left: -7px; top: 5px; width: 10px; height: 10px;
+      border-radius: 50%; background: var(--yellow); border: 2px solid var(--bg);
+    }
+
+  .entry-head { display: flex; align-items: baseline; gap: 0.85rem; flex-wrap: wrap; }
+
+  .entry-head .date { color: var(--yellow); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  .entry-head h2 { margin: 0; font-size: 1.15rem; color: var(--text); font-weight: 600; }
+
+  .entry .sum { color: var(--dim); font-size: 14px; margin: 0.45rem 0 1.4rem; }
+
+  .grp { margin: 0 0 1.15rem; }
+
+  .grp .label {
+      display: inline-block; font-size: 10.5px; letter-spacing: 0.09em; text-transform: uppercase;
+      font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 4px;
+    }
+
+  .grp.added .label { color: var(--green); background: rgba(158, 206, 106, 0.12); }
+  .grp.improved .label { color: var(--blue); background: rgba(122, 162, 247, 0.12); }
+  .grp.fixed .label { color: var(--yellow); background: rgba(224, 175, 104, 0.13); }
+
+  .grp ul { margin: 0.55rem 0 0; padding-left: 1.25rem; }
+
+  .grp li { margin: 0.4rem 0; color: var(--text); font-size: 14px; line-height: 1.55; }
+
+  .grp li code {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 4px;
+      padding: 0.05rem 0.32rem; font-size: 12.5px; color: var(--cyan);
+    }
+
+  .grp li a { color: var(--blue); text-decoration: none; }
+
+  .grp li a:hover { color: var(--cyan); text-decoration: underline; text-underline-offset: 3px; }
+
+  footer { margin-top: 2rem; padding-top: 1.4rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 12.5px; }
+
+  footer a:hover { color: var(--blue); }
+
+  @media (max-width: 560px) { body { font-size: 14px; } h1 { font-size: 1.6rem; } }
+</style>
+  <script>(function(){var s=document.createElement("script");var h=location.hostname;s.src=(h==="localhost"||h==="127.0.0.1"?"":"https://tonicbox.dev")+"/nav.js?v=23";s.defer=true;document.head.appendChild(s);})();</script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">tonicbox.dev &middot; TonicBoxOS</div>
+    <h1><span class="accent">Change</span>log</h1>
+    <p class="lede">
+      What's new in TonicBoxOS - features, improvements, and fixes, newest first.
+    </p>
+  </header>
+
+  <div class="log">
+
+    <div class="entry">
+      <div class="entry-head">
+        <span class="date">2026-08-01</span>
+        <h2>Second stage, full shell redirection, and a broad correctness pass</h2>
+      </div>
+      <p class="sum">A second-stage challenge, a much richer shell and terminal, and a wide sweep of correctness and security fixes across the kernel, toolchain, and userland.</p>
+
+      <div class="grp added">
+        <span class="label">Added</span>
+        <ul>
+          <li>A <strong>second-stage challenge</strong> that begins once you have root.</li>
+          <li>Full shell redirection: stderr and arbitrary descriptors (<code>2&gt;</code>, <code>N&gt;</code>), <code>2&gt;&amp;1</code> (applied left to right), <code>&amp;&gt;</code>, read-write (<code>&lt;&gt;</code>), and closing a descriptor (<code>&gt;&amp;-</code>).</li>
+          <li>Backslash escaping and line continuation in the shell.</li>
+          <li>Terminal: 24-bit truecolor, scroll regions, insert/delete line and character, and bold + reverse-video rendering.</li>
+          <li>A score column on the <a class="ref" href="/hall.html">Hall of Fame</a>.</li>
+          <li>This changelog.</li>
+        </ul>
+      </div>
+
+      <div class="grp improved">
+        <span class="label">Improved</span>
+        <ul>
+          <li>The core utilities (<code>cp</code>, <code>grep</code>, <code>sort</code>, <code>tac</code>, <code>sha256sum</code>, <code>tail</code>, <code>head</code>, <code>cut</code>, <code>sed</code>, <code>uniq</code>, and more) now stream their input, so they stay correct on files of any size instead of silently truncating.</li>
+          <li>POSIX directory permissions are now enforced - search (<code>x</code>) to traverse and read (<code>r</code>) to list, matching real Unix.</li>
+          <li>The compiler and assembler handle longer identifiers, labels, and string literals; the self-hosting toolchain still rebuilds itself byte-for-byte.</li>
+        </ul>
+      </div>
+
+      <div class="grp fixed">
+        <span class="label">Fixed</span>
+        <ul>
+          <li>Compiler correctness: compound assignment (<code>arr[i++] += x</code>) no longer evaluates the left side twice, pointer subtraction scales by element size, and <code>char</code> stores truncate to a byte.</li>
+          <li>Kernel: a path-canonicalization overflow, <code>rename</code> into its own subtree or over a non-empty directory, <code>chown</code> clobbering the group, and a couple of syscalls that could hang the VM on a huge length.</li>
+          <li>Shell: user-defined functions persist across prompts, a glob with many <code>*</code> no longer hangs, <code>read &lt; file</code> works, and builtins honor redirection.</li>
+          <li>Terminal &amp; site: bold text renders, AltGr keys type the right character on non-US keyboards, and the nav no longer double-highlights on the Hall of Fame page.</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    <a href="/ctf.html">&larr; The challenge</a> &nbsp;&middot;&nbsp; part of <a href="https://tonicbox.dev">tonicbox.dev</a>.
+    <p class="copyright">&copy; 2026 TonicBox</p>
+  </footer>
+
+</div>
+</body>
+</html>

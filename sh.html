@@ -110,7 +110,7 @@
       .survive dd { margin-bottom: 0.5rem; }
     }
 </style>
-  <script>(function(){var s=document.createElement("script");var h=location.hostname;s.src=(h==="localhost"||h==="127.0.0.1"?"":"https://tonicbox.dev")+"/nav.js?v=22";s.defer=true;document.head.appendChild(s);})();</script>
+  <script>(function(){var s=document.createElement("script");var h=location.hostname;s.src=(h==="localhost"||h==="127.0.0.1"?"":"https://tonicbox.dev")+"/nav.js?v=23";s.defer=true;document.head.appendChild(s);})();</script>
 </head>
 <body>
 <div class="wrap">
@@ -337,10 +337,9 @@ hi, world</pre>
   <section id="limits">
     <h2><span class="n">08</span>Limits</h2>
     <ul class="list">
-      <li><strong>Arithmetic is integer-only.</strong> <code>$(( ))</code> has no comparison, bitwise, or assignment operators; division or modulo by zero leaves the value unchanged.</li>
+      <li><strong>Arithmetic is integer-only.</strong> <code>$(( ))</code> has no comparison, bitwise, or assignment operators; division or modulo by zero yields 0.</li>
       <li><strong>Globbing is <code>*</code> and <code>?</code> only.</strong> There are no <code>[...]</code> character classes, brace <code>{}</code> expansion, or general <code>~</code> expansion (bare <code>cd</code> still goes home).</li>
-      <li><strong>Redirection covers stdin and stdout.</strong> Only <code>&lt;</code>, <code>&gt;</code>, and <code>&gt;&gt;</code> - there is no stderr redirect, file-descriptor duplication, or here-documents.</li>
-      <li><strong><code>read</code> fills one variable</strong> with the whole line; it does not split the line across multiple names.</li>
+      <li><strong>No here-documents or process substitution.</strong> Redirection is otherwise complete - <code>&lt;</code>, <code>&gt;</code>, <code>&gt;&gt;</code>, <code>2&gt;</code>, any <code>N&gt;</code>, <code>2&gt;&amp;1</code>, <code>&amp;&gt;</code>, <code>&lt;&gt;</code>, and <code>&gt;&amp;-</code> - but there is no <code>&lt;&lt;</code> here-document or <code>&lt;(...)</code> process substitution.</li>
       <li><strong>Leading assignments persist.</strong> <code>NAME=VAL cmd</code> sets the variable in the shell rather than scoping it to that single command.</li>
       <li><strong>Capacities.</strong> Up to 64 variables and 64 aliases (names &le; 31 chars, values &le; 255), 32 functions, 16 positional parameters, and a 16 KB command line; <code>while</code> / <code>until</code> loops stop after 100000 iterations.</li>
     </ul>
