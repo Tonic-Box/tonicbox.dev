@@ -126,7 +126,7 @@
     </p>
     <div class="meta">
       <span class="chip"><b>pipes</b> | ; &amp;&amp; ||</span>
-      <span class="chip"><b>redirect</b> &gt; &gt;&gt; &lt;</span>
+      <span class="chip"><b>redirect</b> &gt; &gt;&gt; &lt; 2&gt; 2&gt;&amp;1 &amp;&gt;</span>
       <span class="chip"><b>flow</b> if while for case</span>
       <span class="chip"><b>jobs</b> &amp; fg bg</span>
     </div>
@@ -175,10 +175,11 @@
       environment live.
     </p>
     <p>
-      Input can span several lines. If a line ends inside an open quote, on a trailing <code>|</code>,
-      <code>&amp;&amp;</code> or <code>||</code>, inside an unclosed <code>if</code> / <code>while</code> /
-      <code>for</code> / <code>case</code> / <code>{</code> block, or right after a bare function head, the
-      shell keeps reading until the command is complete.
+      Input can span several lines. If a line ends with a backslash (line continuation), inside an
+      open quote, on a trailing <code>|</code>, <code>&amp;&amp;</code> or <code>||</code>, inside an
+      unclosed <code>if</code> / <code>while</code> / <code>for</code> / <code>case</code> /
+      <code>{</code> block, or right after a bare function head, the shell keeps reading until the
+      command is complete.
     </p>
   </section>
 
@@ -231,9 +232,12 @@ hello, world (last status 0)</pre>
   <section id="expand">
     <h2><span class="n">03</span>Expansions</h2>
     <p>
-      <strong>Quoting.</strong> <code>'single quotes'</code> are fully literal - nothing inside expands.
-      <code>"double quotes"</code> keep spaces as one word but still expand <code>$</code>. There is no
-      backslash escaping; use quotes to include spaces or special characters.
+      <strong>Quoting.</strong> <code>'single quotes'</code> are fully literal - nothing inside expands,
+      not even a backslash. <code>"double quotes"</code> keep spaces as one word but still expand
+      <code>$</code>; inside them a backslash escapes only <code>$</code>, <code>\</code>,
+      <code>"</code>, <code>`</code>, and a newline. Outside quotes a backslash escapes the next
+      character - <code>\ </code> is a literal space, <code>\$</code> a literal dollar - and a
+      backslash at the end of a line continues the command onto the next line.
     </p>
     <table>
       <tr><th>Expansion</th><th>Does</th></tr>
@@ -258,6 +262,10 @@ hello, world (last status 0)</pre>
       <tr><td class="k"><code>a || b</code></td><td class="desc">run <code>b</code> only if <code>a</code> failed</td></tr>
       <tr><td class="k"><code>cmd &gt; f</code> / <code>&gt;&gt; f</code></td><td class="desc">send stdout to a file (truncate / append)</td></tr>
       <tr><td class="k"><code>cmd &lt; f</code></td><td class="desc">read stdin from a file</td></tr>
+      <tr><td class="k"><code>cmd 2&gt; f</code></td><td class="desc">send stderr to a file; any descriptor works with <code>N&gt; f</code></td></tr>
+      <tr><td class="k"><code>cmd &gt; f 2&gt;&amp;1</code></td><td class="desc">send stderr wherever stdout currently points; redirections apply left to right</td></tr>
+      <tr><td class="k"><code>cmd &amp;&gt; f</code></td><td class="desc">send both stdout and stderr to a file</td></tr>
+      <tr><td class="k"><code>cmd &gt;&amp;-</code> / <code>&lt;&gt; f</code></td><td class="desc">close a descriptor; open a file for read-write</td></tr>
       <tr><td class="k"><code>cmd &amp;</code></td><td class="desc">run in the background</td></tr>
     </table>
     <p>

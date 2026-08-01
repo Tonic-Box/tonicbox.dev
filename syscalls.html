@@ -102,7 +102,9 @@
       <code>r1</code>-<code>r6</code>; the result comes back in <code>r1</code>. From TBC that is
       <code>__sys(num, a, b, c, d, e, f)</code>. A negative return is an errno (e.g. <code>-1</code>&nbsp;EPERM,
       <code>-2</code>&nbsp;ENOENT, <code>-9</code>&nbsp;EBADF, <code>-13</code>&nbsp;EACCES). Calls marked
-      <span style="color:var(--red)">root</span> require an effective uid of 0. Unallocated numbers return
+      <span style="color:var(--red)">root</span> require an effective uid of 0. Resolving a path needs search
+      (execute) permission on every directory it descends through, and listing a directory needs read
+      permission on it. Unallocated numbers return
       <code>-38</code>&nbsp;ENOSYS. A handful of kernel-internal calls (shell&harr;kernel handshakes and
       other plumbing) exist but are intentionally left off this list - if you're poking at those, you're
       past needing docs.
@@ -129,14 +131,14 @@
       <tr><td class="num">2</td><td class="sig"><code>open(char* path, int flags)</code></td><td class="d">Open (or create) a file. Flags: <code>O_WRONLY=1 O_RDWR=2 O_CREAT=0x40 O_TRUNC=0x200 O_APPEND=0x400</code>. Returns an fd; <code>-2</code>/<code>-13</code>/<code>-21</code>/<code>-28</code>.</td></tr>
       <tr><td class="num">3</td><td class="sig"><code>close(int fd)</code></td><td class="d">Release the fd. Always returns 0.</td></tr>
       <tr><td class="num">5</td><td class="sig"><code>stat(char* path, int* out)</code></td><td class="d">Fill a 5-word stat: <code>out[0]=mode, [4]=uid, [8]=size, [12]=type (1 file / 2 dir), [16]=gid</code>. <code>-2</code> if missing.</td></tr>
-      <tr><td class="num">7</td><td class="sig"><code>listdir(char* path, char* buf, int cap)</code></td><td class="d">Write directory entry names into <code>buf</code>. Returns bytes written; <code>-2</code>/<code>-20</code>.</td></tr>
+      <tr><td class="num">7</td><td class="sig"><code>listdir(char* path, char* buf, int cap)</code></td><td class="d">Write directory entry names into <code>buf</code>. Returns bytes written; <code>-2</code>/<code>-13</code>/<code>-20</code>.</td></tr>
       <tr><td class="num">9</td><td class="sig"><code>getcwd(char* buf, int cap)</code></td><td class="d">Copy the working directory into <code>buf</code>. Returns its length.</td></tr>
       <tr><td class="num">15</td><td class="sig"><code>unlink(char* path)</code></td><td class="d">Delete a regular file. Returns 0; <code>-2</code>/<code>-13</code>/<code>-21</code>.</td></tr>
       <tr><td class="num">16</td><td class="sig"><code>mkdir(char* path, int mode)</code></td><td class="d">Create a directory (mode masked by the umask). Returns 0; <code>-13</code>/<code>-17</code>/<code>-28</code>.</td></tr>
       <tr><td class="num">17</td><td class="sig"><code>rmdir(char* path)</code></td><td class="d">Remove an empty directory. Returns 0; <code>-2</code>/<code>-13</code>/<code>-20</code>/<code>-39</code>.</td></tr>
-      <tr><td class="num">18</td><td class="sig"><code>rename(char* old, char* new)</code></td><td class="d">Rename or move an entry, replacing any existing target. Returns 0; <code>-2</code>/<code>-13</code>/<code>-28</code>.</td></tr>
+      <tr><td class="num">18</td><td class="sig"><code>rename(char* old, char* new)</code></td><td class="d">Rename or move an entry, replacing an existing file or empty directory. Returns 0; <code>-2</code>, <code>-13</code>, <code>-22</code>&nbsp;EINVAL (into its own subtree), <code>-28</code>, <code>-39</code>&nbsp;ENOTEMPTY (target directory not empty).</td></tr>
       <tr><td class="num">19</td><td class="sig"><code>chmod(char* path, int mode)</code></td><td class="d">Set permission bits. Owner or root only. Returns 0; <code>-1</code>&nbsp;EPERM / <code>-2</code>.</td></tr>
-      <tr class="root"><td class="num">23</td><td class="sig"><code>chown(char* path, int uid)</code></td><td class="d">Set both uid and gid of an entry. Returns 0; <code>-1</code>&nbsp;EPERM / <code>-2</code>.</td></tr>
+      <tr class="root"><td class="num">23</td><td class="sig"><code>chown(char* path, int uid)</code></td><td class="d">Set an entry's owner uid (leaves the gid; clears any setuid/setgid bit). Returns 0; <code>-1</code>&nbsp;EPERM / <code>-2</code>.</td></tr>
       <tr><td class="num">25</td><td class="sig"><code>chdir(char* path)</code></td><td class="d">Change the working directory. Returns 0; <code>-2</code>/<code>-20</code>.</td></tr>
       <tr><td class="num">29</td><td class="sig"><code>lseek(int fd, int off, int whence)</code></td><td class="d">Reposition an fd. <code>whence</code>: 0&nbsp;SET, 1&nbsp;CUR, 2&nbsp;END. Returns the new offset; <code>-9</code>.</td></tr>
       <tr><td class="num">85</td><td class="sig"><code>pipe(int fds[2])</code></td><td class="d">Create a pipe: <code>fds[0]</code> is the read end, <code>fds[1]</code> the write end. Reading blocks until data or EOF (all writers closed); writing blocks until it fits, and raises <code>SIGPIPE</code>/<code>-32</code>&nbsp;EPIPE once every reader has closed. Returns 0; <code>-24</code>&nbsp;EMFILE.</td></tr>
@@ -147,7 +149,7 @@
       <tr><td class="num">90</td><td class="sig"><code>lstat(char* path, void* statbuf)</code></td><td class="d">Like <code>stat</code> but does not follow a final symlink (type&nbsp;3&nbsp;= symlink). Returns 0; <code>-2</code>.</td></tr>
       <tr><td class="num">91</td><td class="sig"><code>link(char* oldpath, char* newpath)</code></td><td class="d">Create a hard link <code>newpath</code> to the same inode as <code>oldpath</code>. Returns 0; <code>-1</code>&nbsp;EPERM (directory) / <code>-13</code>/<code>-17</code>.</td></tr>
       <tr><td class="num">47</td><td class="sig"><code>umask(int mask)</code></td><td class="d">Set the file-creation mask. Returns the previous mask.</td></tr>
-      <tr><td class="num">49</td><td class="sig"><code>chowng(char* path, int uid, int gid)</code></td><td class="d">Change uid and/or gid; pass <code>-1</code> to leave a field alone. Changing uid needs root; changing gid needs root or (owner and group member). <code>-1</code>/<code>-2</code>.</td></tr>
+      <tr><td class="num">49</td><td class="sig"><code>chowng(char* path, int uid, int gid)</code></td><td class="d">Change uid and/or gid (clears any setuid/setgid bit); pass <code>-1</code> to leave a field alone. Changing uid needs root; changing gid needs root or (owner and group member). <code>-1</code>/<code>-2</code>.</td></tr>
     </table>
   </section>
 
