@@ -135,7 +135,7 @@
     <div class="eyebrow">TonicBoxOS &middot; language reference</div>
     <h1><span class="accent">TBC</span> standard library</h1>
     <p class="lede">There is no libc. Every program is compiled with this small built-in prelude of thin syscall wrappers, plus the raw <code>__sys</code> intrinsic underneath. That is the entire standard library - anything else you write yourself.</p>
-    <div class="meta"><span class="chip"><b>functions</b> 45</span><span class="chip"><b>source</b> the compiler prelude</span><span class="chip"><a href="/tbc.html">&larr; TBC reference</a></span><span class="chip"><a href="/syscalls.html">syscall reference &rarr;</a></span></div>
+    <div class="meta"><span class="chip"><b>functions</b> 48</span><span class="chip"><b>source</b> the compiler prelude</span><span class="chip"><a href="/tbc.html">&larr; TBC reference</a></span><span class="chip"><a href="/syscalls.html">syscall reference &rarr;</a></span></div>
   </header>
   <nav class="toc">
     <a href="#i-o-terminal">I/O &amp; terminal</a><span>/</span><a href="#system">System</a><span>/</span><a href="#filesystem">Filesystem</a><span>/</span><a href="#process">Process</a><span>/</span><a href="#identity">Identity</a><span>/</span><a href="#strings">Strings</a><span>/</span><a href="#memory">Memory</a><span>/</span><a href="#processes">Processes</a><span>/</span><a href="#intrinsic">Intrinsic</a>
@@ -462,6 +462,38 @@
       <tr><th>param</th><th>meaning</th></tr>
       <tr><td><code>p</code></td><td class="desc">a pointer previously returned by <code>malloc</code>, or 0</td></tr>
     </table>
+    <h3 id="mmap"><code>mmap</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">mmap</span>(<span class="ty">int</span> a, <span class="ty">int</span> l, <span class="ty">int</span> p, <span class="ty">int</span> f, <span class="ty">int</span> d, <span class="ty">int</span> o)</code></pre>
+    <p>Map <code>len</code> bytes into the address space and return the mapping's address. <code>prot</code> combines 1 read, 2 write, 4 exec; <code>flags</code> combines 0x10 MAP_FIXED and 0x20 MAP_ANON. An anonymous map (<code>MAP_ANON</code>, <code>fd</code> ignored) is demand-zero; a file-backed map fills pages from <code>fd</code> at <code>off</code> and needs the same read permission as opening the file. Pass <code>addr</code> only with <code>MAP_FIXED</code>.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>a</code></td><td class="desc">requested address (only with MAP_FIXED, else 0)</td></tr>
+      <tr><td><code>l</code></td><td class="desc">bytes to map (rounded up to whole pages)</td></tr>
+      <tr><td><code>p</code></td><td class="desc">protection bits: 1 read | 2 write | 4 exec</td></tr>
+      <tr><td><code>f</code></td><td class="desc">flags: 0x10 MAP_FIXED | 0x20 MAP_ANON</td></tr>
+      <tr><td><code>d</code></td><td class="desc">file descriptor for a file-backed map (else -1)</td></tr>
+      <tr><td><code>o</code></td><td class="desc">byte offset into the file</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> the mapping address, or a negative errno</p>
+    <h3 id="munmap"><code>munmap</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">munmap</span>(<span class="ty">int</span> a, <span class="ty">int</span> l)</code></pre>
+    <p>Release a whole prior <code>mmap</code> mapping, freeing its pages. <code>a</code> and <code>l</code> must match the original mapping.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>a</code></td><td class="desc">the mapping's base address</td></tr>
+      <tr><td><code>l</code></td><td class="desc">the mapping's length</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> 0, or -EINVAL if it does not match a mapping</p>
+    <h3 id="mprotect"><code>mprotect</code></h3>
+    <pre><code><span class="ty">int</span> <span class="fn">mprotect</span>(<span class="ty">int</span> a, <span class="ty">int</span> l, <span class="ty">int</span> p)</code></pre>
+    <p>Change the protection of a whole <code>mmap</code> mapping (see <code>mmap</code> for the protection bits). A write to a page mapped without write permission faults.</p>
+    <table>
+      <tr><th>param</th><th>meaning</th></tr>
+      <tr><td><code>a</code></td><td class="desc">the mapping's base address</td></tr>
+      <tr><td><code>l</code></td><td class="desc">the mapping's length</td></tr>
+      <tr><td><code>p</code></td><td class="desc">new protection bits</td></tr>
+    </table>
+    <p class="tight"><strong>Returns</strong> 0, or a negative errno</p>
   </section>
   <section id="processes">
     <h2><span class="n">08</span>Processes</h2>

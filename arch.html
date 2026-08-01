@@ -127,15 +127,17 @@
       <tr><th>Layer</th><th>What it is</th></tr>
       <tr><td class="k">host</td><td class="desc">a JavaScript shim: feeds input, paints an output buffer to the screen, and ticks the kernel while idle</td></tr>
       <tr><td class="k">kernel</td><td class="desc"><code>tbvm.wasm</code>, native WebAssembly: scheduler, process table, signals, filesystem, drivers</td></tr>
-      <tr><td class="k">userland</td><td class="desc">TB32 code, interpreted per instruction; one isolated 2&nbsp;MiB window per process</td></tr>
+      <tr><td class="k">userland</td><td class="desc">TB32 code, interpreted per instruction; each process runs in its own isolated 16&nbsp;MiB paged address space</td></tr>
     </table>
     <p>
       Userland enters the kernel only through a <code>SYS</code> instruction, with the call number in
-      <code>r7</code>. Windows are isolated: there is no shared memory and no way to address another
-      process's window.
+      <code>r7</code>. Each process has its own page table, so address spaces are isolated: there is no
+      shared memory and no virtual address that reaches another process or the kernel. Pages are
+      allocated on first touch (demand-zero) from a physical frame pool, and <code>fork</code> shares
+      them copy-on-write.
     </p>
     <figure>
-      <img src="arch-runtime.svg" alt="Three stacked layers: the browser host (JavaScript driver) exchanges bytes with the tbvm.wasm native Zig kernel; below a dashed syscall boundary sits the TB32 userland, where init (PID 1) forks and execs syslogd, the login shell -sh, and commands, each in its own isolated 2 MiB window.">
+      <img src="arch-runtime.svg" alt="Three stacked layers: the browser host (JavaScript driver) exchanges bytes with the tbvm.wasm native Zig kernel; below a dashed syscall boundary sits the TB32 userland, where init (PID 1) forks and execs syslogd, the login shell -sh, and commands, each in its own isolated 16 MiB paged address space.">
       <figcaption>Host, kernel, and an isolated userland across the syscall boundary.</figcaption>
     </figure>
   </section>
@@ -143,7 +145,7 @@
   <section id="proc">
     <h2><span class="n">01</span>Processes</h2>
     <p>
-      <code>fork</code> copies a process into a fresh window; <code>exec</code> replaces the image in place;
+      <code>fork</code> copies a process copy-on-write into a fresh address space; <code>exec</code> replaces the image in place;
       <code>wait</code> reaps children. Scheduling is <strong>preemptive round-robin</strong>: each runnable
       process gets a fixed instruction quantum (200k instructions) per turn, so daemons and background jobs
       advance while the shell waits at a prompt.
@@ -167,7 +169,7 @@
       <tr><th>Piece</th><th>What it is</th></tr>
       <tr><td class="k"><code>init</code></td><td class="desc">PID 1; spawns services + the login shell, reaps orphans</td></tr>
       <tr><td class="k"><code>syslogd</code></td><td class="desc">a daemon draining the kernel log to <code>/var/log/messages</code></td></tr>
-      <tr><td class="k">scheduler</td><td class="desc">preemptive round-robin over a pool of process windows</td></tr>
+      <tr><td class="k">scheduler</td><td class="desc">preemptive round-robin over a pool of process slots</td></tr>
       <tr><td class="k">signals</td><td class="desc"><code>kill</code>, handlers, <code>pause</code>, job control</td></tr>
     </table>
   </section>
@@ -203,7 +205,8 @@
     <p>Structures are fixed-size and in-memory. The main limits:</p>
     <table>
       <tr><th>Area</th><th>Limit</th></tr>
-      <tr><td class="k">processes</td><td class="desc">a fixed pool of process windows; beyond it, spawns are refused rather than queued</td></tr>
+      <tr><td class="k">processes</td><td class="desc">a fixed pool of process slots; beyond it, spawns are refused rather than queued</td></tr>
+      <tr><td class="k">memory</td><td class="desc">each process has a 16&nbsp;MiB paged virtual address space (4&nbsp;KiB pages, demand-zero, copy-on-write fork, <code>mmap</code>/<code>mprotect</code>); pages are backed by a shared physical frame pool, so total live memory across all processes is bounded by the pool</td></tr>
       <tr><td class="k">filesystem</td><td class="desc">an in-memory inode/block ramdisk with a fixed inode count and a fixed number of data blocks; state is per-session (reset on reload, or saved to the browser)</td></tr>
       <tr><td class="k">arguments</td><td class="desc">a command takes a bounded number of arguments</td></tr>
       <tr><td class="k">streams</td><td class="desc">a pipe is a bounded ring buffer (64&nbsp;KiB); a full pipe blocks the writer until the reader drains it, so large streams flow through without loss</td></tr>

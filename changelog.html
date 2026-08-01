@@ -82,6 +82,34 @@
     <div class="entry">
       <div class="entry-head">
         <span class="date">2026-08-01</span>
+        <h2>Real virtual memory: paging, copy-on-write fork, and mmap</h2>
+      </div>
+      <p class="sum">Each process moved from a single fixed 2&nbsp;MiB window to a proper paged virtual address space - larger programs, demand allocation, copy-on-write fork, and an <code>mmap</code>/<code>mprotect</code> interface.</p>
+
+      <div class="grp added">
+        <span class="label">Added</span>
+        <ul>
+          <li><strong>Per-process paged virtual memory</strong>: a 16&nbsp;MiB virtual address space per process, in 4&nbsp;KiB pages served on demand (demand-zero) from a shared physical frame pool.</li>
+          <li><code>mmap</code>, <code>munmap</code>, and <code>mprotect</code> (<a class="ref" href="/syscalls.html">syscalls</a> 100-102): anonymous and file-backed mappings with changeable page protection.</li>
+          <li>Guard pages: a null-pointer dereference, or a stack that runs past its limit, now faults cleanly instead of silently corrupting neighbouring memory.</li>
+        </ul>
+      </div>
+
+      <div class="grp improved">
+        <span class="label">Improved</span>
+        <ul>
+          <li><code>fork</code> is now <strong>copy-on-write</strong>: the child shares the parent's pages until one side writes, so it no longer copies the whole address space up front.</li>
+          <li>Much larger heaps and programs: the old hard 2&nbsp;MiB per-process ceiling is gone (about 14&nbsp;MiB usable), so bigger allocations and heavier programs run.</li>
+          <li>The memory hot path stays fast under address translation, via a software TLB and wider aligned loads.</li>
+          <li><code>/proc/meminfo</code> now reports the real physical pool (total and free).</li>
+          <li>The debugger reads and writes a traced process through its own page table.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="entry">
+      <div class="entry-head">
+        <span class="date">2026-08-01</span>
         <h2>Second stage, full shell redirection, and a broad correctness pass</h2>
       </div>
       <p class="sum">A second-stage challenge, a much richer shell and terminal, and a wide sweep of correctness and security fixes across the kernel, toolchain, and userland.</p>
