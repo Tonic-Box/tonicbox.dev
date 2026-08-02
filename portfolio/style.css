@@ -6,6 +6,10 @@
   --muted: #565f89;
   --green: #9ece6a;
   --blue: #7aa2f7;
+  --red: #f7768e;
+  --zig: #ff9e64;
+  --java: #e0af68;
+  --cs: #bb9af7;
   --mono: "Cascadia Code", "JetBrains Mono", "Fira Code", Consolas, "SF Mono", monospace;
   --sans: "Segoe UI", system-ui, -apple-system, sans-serif;
 }
@@ -110,10 +114,57 @@ a {
   text-underline-offset: 3px;
 }
 
+.tag {
+  font-size: 11.5px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.05em 0.5em;
+  margin-left: 0.6rem;
+  vertical-align: middle;
+}
+
+.tag-zig {
+  color: var(--zig);
+  border-color: color-mix(in srgb, var(--zig) 40%, var(--border));
+}
+
+.tag-java {
+  color: var(--java);
+  border-color: color-mix(in srgb, var(--java) 40%, var(--border));
+}
+
+.tag-cs {
+  color: var(--cs);
+  border-color: color-mix(in srgb, var(--cs) 40%, var(--border));
+}
+
 .project p {
   font-family: var(--sans);
   font-size: 14.5px;
   margin-top: 0.15rem;
+}
+
+main section {
+  margin-bottom: 2.75rem;
+}
+
+main section:last-child {
+  margin-bottom: 0;
+}
+
+.group-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--red);
+  margin-bottom: 1.1rem;
+}
+
+.group-title::before {
+  content: "# ";
+  color: var(--muted);
 }
 
 footer {
