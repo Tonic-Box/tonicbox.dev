@@ -298,7 +298,7 @@ sw   r1, [sp, 8]</pre>
       <tr><td class="op"><code>.globl NAME</code></td><td class="d">accepted (all labels are already global); no effect.</td></tr>
       <tr><td class="op"><code>.entry LABEL</code></td><td class="d">set the entry point (default <code>_start</code>).</td></tr>
     </table>
-    <p>Assemble with <code>as file.s -o out</code> in the terminal (the host toolchain is <code>tbas.py</code>).
+    <p>Assemble with <code>as file.s -o out</code> in the terminal.
       <code>cc</code> emits <code>.s</code>, so <code>cc x.c -o x</code> then studying the disassembly is the fast
       way to see what any C compiles to.</p>
     <pre><span class="c">; minimal program: write "hi\n" and exit</span>
