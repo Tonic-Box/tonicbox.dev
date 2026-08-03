@@ -86,6 +86,7 @@
     var apex = isLocal ? "" : APEX;
     var portfolioUrl = isLocal ? "/portfolio/" : "https://portfolio.tonicbox.dev";
     var blogUrl = isLocal ? "/blog/" : "https://blog.tonicbox.dev";
+    var emulatorUrl = isLocal ? "/emulator/" : "https://emulator.tonicbox.dev";
 
     var nav = el("nav", "tbnav", { "aria-label": "site" });
 
@@ -103,9 +104,11 @@
     var homeItem = link(apex + "/", "Home");
     var portfolioItem = link(portfolioUrl, "Portfolio");
     var blogItem = link(blogUrl, "Blog");
+    var emulatorItem = link(emulatorUrl, "Emulator");
     items.appendChild(homeItem);
     items.appendChild(blogItem);
     items.appendChild(portfolioItem);
+    items.appendChild(emulatorItem);
 
     var drop = el("div", "tbnav-drop");
     var ctf = link(apex + "/ctf.html", "CTF Challenge", "tbnav-ctf");
@@ -161,14 +164,17 @@
     var path = location.pathname.replace(/index\.html$/, "");
     var subPortfolio = host.indexOf("portfolio.") === 0;
     var subBlog = host.indexOf("blog.") === 0;
+    var subEmulator = host.indexOf("emulator.") === 0;
     var onPortfolio = subPortfolio || path.indexOf("/portfolio") === 0;
     var onBlog = subBlog || path.indexOf("/blog") === 0;
+    var onEmulator = subEmulator || path.indexOf("/emulator") === 0;
     var onCtf = /\/(ctf|tbc|sh|vi|tbdbg|as|arch|syscalls|tbc-std-docs|changelog)\.html$/.test(location.pathname);
     var onHall = /\/hall\.html$/.test(location.pathname);
-    var onHome = !subPortfolio && !subBlog && !onPortfolio && !onBlog && !onCtf && !onHall && (path === "/" || path === "");
+    var onHome = !subPortfolio && !subBlog && !subEmulator && !onPortfolio && !onBlog && !onEmulator && !onCtf && !onHall && (path === "/" || path === "");
     if (onHome) { brand.classList.add("active"); homeItem.classList.add("active"); }
     if (onPortfolio) portfolioItem.classList.add("active");
     if (onBlog) blogItem.classList.add("active");
+    if (onEmulator) emulatorItem.classList.add("active");
     if (onCtf) ctf.classList.add("active");
     if (onHall) hallItem.classList.add("active");
   }

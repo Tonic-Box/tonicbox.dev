@@ -1,0 +1,35 @@
+body.web {
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding-top: 48px;
+}
+
+body.web #app {
+  height: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+#emu-footer {
+  flex: none;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--panel-2);
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+#emu-footer a {
+  color: var(--blue);
+  text-decoration: none;
+}
+
+#emu-footer a:hover {
+  color: var(--cyan);
+}

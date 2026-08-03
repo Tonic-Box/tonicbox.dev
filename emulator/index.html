@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TB32 Emulator</title>
+<meta name="description" content="TB32 Emulator - a graphical emulator and assembly IDE for the TB32 instruction set, running in the browser.">
+<link rel="canonical" href="https://emulator.tonicbox.dev/">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230b0e14'/><text x='2' y='12' font-family='monospace' font-size='11' fill='%237aa2f7'>&gt;_</text></svg>">
+<link rel="stylesheet" href="vendor/codemirror/codemirror.min.css">
+<link rel="stylesheet" href="vendor/vt.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="web.css">
+<script>(function(){var s=document.createElement("script");var h=location.hostname;s.src=(h==="localhost"||h==="127.0.0.1"?"":"https://tonicbox.dev")+"/nav.js?v=23";s.defer=true;document.head.appendChild(s);})();</script>
+</head>
+<body class="web">
+<div id="app">
+  <div id="menubar">
+    <div class="menu">
+      <button class="menu-title">File</button>
+      <div class="menu-drop">
+        <button data-act="new">New</button>
+        <button data-act="open">Open&#8230;</button>
+        <button data-act="save">Save</button>
+        <button data-act="saveas">Save As&#8230;</button>
+      </div>
+    </div>
+  </div>
+  <header id="toolbar">
+    <span class="brand">tb32emu</span>
+    <span class="dim">TB32 emulator</span>
+    <span class="grow"></span>
+    <button id="config" class="tbtn" title="Run configuration">Config</button>
+    <button id="assemble" class="tbtn" title="Assemble (Ctrl-B)">Assemble</button>
+    <span class="tbsep"></span>
+    <select id="speed" class="tsel" title="Run speed">
+      <option value="full">Full Speed</option>
+      <option value="fast">Fast</option>
+      <option value="medium">Medium</option>
+      <option value="slow">Slow</option>
+      <option value="crawl">Crawl</option>
+    </select>
+    <button id="run" class="tbtn tbtn-run" title="Run">Run</button>
+    <button id="debug" class="tbtn" title="Debug (pause at entry)">Debug</button>
+    <button id="step" class="tbtn" title="Step one instruction" disabled>Step</button>
+    <button id="continue" class="tbtn" title="Continue" disabled>Continue</button>
+    <button id="pause" class="tbtn" title="Pause" disabled>Pause</button>
+    <button id="stop" class="tbtn" title="Stop" disabled>Stop</button>
+  </header>
+  <div id="main">
+    <div id="left">
+      <div id="tabbar"></div>
+      <div id="editor-pane"><div id="editor"></div></div>
+      <div id="vdivider" title="Drag to resize"></div>
+      <div id="bottom">
+        <div id="bottom-tabs">
+          <button class="btab active" data-panel="console">Console</button>
+          <button class="btab" data-panel="terminal">Terminal</button>
+          <span class="grow"></span>
+          <button id="clear-console" class="clearbtn" title="Clear console">clear</button>
+        </div>
+        <div id="bottom-body">
+          <pre id="console" class="panel active"></pre>
+          <div id="terminal" class="panel">
+            <div class="term-status">
+              <span id="term-dot" class="dot dot-idle"></span>
+              <span id="term-state">idle</span>
+            </div>
+            <div id="term-host"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <aside id="debug-pane"></aside>
+  </div>
+</div>
+
+<footer id="emu-footer">
+  <span>&copy; 2026 TonicBox</span>
+  <a href="https://github.com/Tonic-Box/tb32emu" target="_blank" rel="noopener">github.com/Tonic-Box/tb32emu</a>
+</footer>
+
+<div id="config-modal" class="modal hidden">
+  <div class="modal-box">
+    <h2>Run configuration</h2>
+    <label for="cfg-args">Arguments</label>
+    <input id="cfg-args" type="text" spellcheck="false" placeholder="arg1 arg2">
+    <label for="cfg-env">Environment (KEY=VALUE per line)</label>
+    <textarea id="cfg-env" rows="4" spellcheck="false" placeholder="HOME=/root"></textarea>
+    <label for="cfg-seed">RNG seed (blank = random)</label>
+    <input id="cfg-seed" type="text" spellcheck="false" placeholder="e.g. 42">
+    <div class="modal-actions">
+      <button id="cfg-cancel" class="tbtn">Cancel</button>
+      <button id="cfg-save" class="tbtn tbtn-run">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="confirm-modal" class="modal hidden">
+  <div class="modal-box">
+    <h2>Unsaved changes</h2>
+    <p id="confirm-msg" class="hint"></p>
+    <div class="modal-actions">
+      <button id="confirm-cancel" class="tbtn">Cancel</button>
+      <button id="confirm-ok" class="tbtn tbtn-danger">Discard</button>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/codemirror/codemirror.min.js"></script>
+<script src="vendor/codemirror/simple.min.js"></script>
+<script src="vendor/vt.js"></script>
+<script src="wasm-bridge.js"></script>
+<script src="editor.js"></script>
+<script src="terminal.js"></script>
+<script src="debugger.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
