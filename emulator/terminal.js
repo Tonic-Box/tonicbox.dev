@@ -107,16 +107,21 @@
     }
   }
 
-  function onKey(e) {
-    if (!active) return;
-    var b = keyBytes(e);
+  function handleBytes(b) {
     if (b === "") return;
-    e.preventDefault();
     if (raw) { inputBuf += b; return; }
     if (b === "\n") { vt.write("\r\n"); inputBuf += lineBuf + "\n"; lineBuf = ""; render(); return; }
     if (b === "\x7f") { if (lineBuf.length) { lineBuf = lineBuf.slice(0, -1); vt.write("\b \b"); render(); } return; }
     if (b.length === 1 && b >= " ") { lineBuf += b; vt.write(b); render(); return; }
     inputBuf += b;
+  }
+
+  function onKey(e) {
+    if (!active) return;
+    var b = keyBytes(e);
+    if (b === "") return;
+    e.preventDefault();
+    handleBytes(b);
   }
 
   document.addEventListener("keydown", onKey);
@@ -137,6 +142,8 @@
     write: function (s) { vt.write(s); render(); },
     setRaw: function (v) { raw = !!v; },
     setActive: function (v) { active = !!v; },
+    feedKey: handleBytes,
+    isRaw: function () { return raw; },
     takeInput: function () { var s = inputBuf; inputBuf = ""; return s; },
   };
 })();

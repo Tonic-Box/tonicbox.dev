@@ -1,6 +1,7 @@
 body.web {
   overflow: hidden;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   padding-top: 48px;
@@ -32,4 +33,182 @@ body.web #app {
 
 #emu-footer a:hover {
   color: var(--cyan);
+}
+
+#mview-bar {
+  display: none;
+}
+
+#term-keybar {
+  display: none;
+}
+
+.tbtn.has-icon svg {
+  display: none;
+}
+
+.menu.open .menu-drop {
+  display: block;
+}
+
+@media (max-width: 820px) {
+  #main {
+    flex-direction: column;
+  }
+
+  #left {
+    min-height: 0;
+  }
+
+  #vdivider {
+    display: none;
+  }
+
+  #debug-pane {
+    width: auto;
+    flex: 1;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+
+  #app[data-mview] #left,
+  #app[data-mview] #debug-pane {
+    display: none;
+  }
+
+  #app[data-mview="editor"] #left,
+  #app[data-mview="console"] #left,
+  #app[data-mview="terminal"] #left {
+    display: flex;
+  }
+
+  #app[data-mview="debugger"] #debug-pane {
+    display: flex;
+    flex-direction: column;
+  }
+
+  #app[data-mview="editor"] #bottom {
+    display: none;
+  }
+
+  #app[data-mview="console"] #tabbar,
+  #app[data-mview="console"] #editor-pane,
+  #app[data-mview="terminal"] #tabbar,
+  #app[data-mview="terminal"] #editor-pane {
+    display: none;
+  }
+
+  #app[data-mview="console"] #bottom,
+  #app[data-mview="terminal"] #bottom {
+    display: flex;
+    flex: 1;
+  }
+
+  #bottom-tabs {
+    display: none;
+  }
+
+  #toolbar {
+    gap: 4px;
+    padding: 0 8px;
+    overflow-x: auto;
+  }
+
+  #toolbar .brand,
+  #toolbar .dim,
+  #toolbar .grow,
+  #toolbar .tbsep {
+    display: none;
+  }
+
+  .tbtn.has-icon {
+    flex: none;
+    width: 40px;
+    height: 36px;
+    padding: 0;
+    font-size: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .tbtn.has-icon svg {
+    display: block;
+    width: 20px;
+    height: 20px;
+  }
+
+  #speed {
+    flex: none;
+  }
+
+  .CodeMirror {
+    font-size: 16px;
+  }
+
+  .modal-box input,
+  .modal-box textarea {
+    font-size: 16px;
+  }
+
+  #mview-bar {
+    flex: none;
+    display: flex;
+    height: 46px;
+    background: var(--panel-2);
+    border-top: 1px solid var(--border);
+  }
+
+  #mview-bar button {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  #mview-bar button.active {
+    color: var(--blue);
+    box-shadow: inset 0 -2px 0 var(--blue);
+  }
+
+  #app[data-mview="terminal"] #term-keybar {
+    display: flex;
+  }
+
+  #term-keybar {
+    flex: none;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 5px;
+    background: var(--panel-2);
+    border-top: 1px solid var(--border);
+  }
+
+  #term-keybar button {
+    min-width: 42px;
+    height: 34px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  #term-keybar button.active {
+    border-color: var(--blue);
+    color: var(--blue);
+  }
+
+  #term-keybar svg {
+    width: 16px;
+    height: 16px;
+  }
 }

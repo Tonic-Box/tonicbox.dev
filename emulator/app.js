@@ -32,6 +32,7 @@
       p.classList.toggle("active", p.id === name);
     });
     if (name === "terminal") window.term.fit();
+    if (window.onPanelChange) window.onPanelChange(name);
   }
 
   function initBottomTabs() {
