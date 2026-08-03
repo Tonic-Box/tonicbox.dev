@@ -130,7 +130,7 @@
   }
 
   function newTab(name, content, path, saved) {
-    tabs.push({ name: name || nextName(), doc: CM.Doc(content || "", "tb32"), path: path || null, bps: new Set(), saved: saved === undefined ? null : saved });
+    tabs.push({ name: name || nextName(), doc: CM.Doc(content || "", "tb32"), path: path || null, bps: new Set(), saved: saved === undefined ? (content || "") : saved });
     active = -1;
     select(tabs.length - 1);
   }
