@@ -115,12 +115,14 @@
     <p class="lede">
       TB32 is the CPU underneath everything: a small, fixed-width 32-bit RISC. This is its instruction set -
       what <code>objdump</code> and <a href="/tbdbg.html">tbdbg</a> disassemble, what <code>cc</code> emits, and
-      what <code>as</code> turns into a runnable object. Around 50 instructions in four encoding formats.
+      what <code>as</code> turns into a runnable object. Around 50 instructions in four encoding formats, plus an
+      optional privileged extension (<a href="#priv">TB32-V</a>) for virtualization.
     </p>
     <div class="conv">
       <strong>At a glance.</strong> Fixed <strong>32-bit</strong> instructions, little-endian. Sixteen registers
-      <code>r0</code>-<code>r15</code>; <code>r0</code> is hard-wired to zero. Loads/stores go through a flat
-      2&nbsp;MiB window. Comparisons set flags; conditional branches read them. The <code>sys</code> instruction
+      <code>r0</code>-<code>r15</code>; <code>r0</code> is hard-wired to zero. Loads and stores address a byte memory the
+      machine provides - on TonicBoxOS a per-process, demand-paged virtual address space. Comparisons set flags;
+      conditional branches read them. The <code>sys</code> instruction
       is the only door to the <a href="/syscalls.html">kernel</a>.
     </div>
   </header>
@@ -132,6 +134,7 @@
     <a href="#mem">loads &amp; stores</a><span>/</span>
     <a href="#flow">flow &amp; conditions</a><span>/</span>
     <a href="#system">system &amp; faults</a><span>/</span>
+    <a href="#priv">privileged (TB32-V)</a><span>/</span>
     <a href="#pseudo">pseudo-instructions</a><span>/</span>
     <a href="#asm">assembler syntax</a>
   </nav>
@@ -165,7 +168,7 @@
       <tr><td class="op">REG</td><td><span class="f-op">opcode</span></td><td style="color:var(--muted)">-</td><td><span class="f-rs">rs1</span></td><td style="color:var(--muted)">-</td></tr>
     </table>
     <p>Loads, stores, and all immediate ops use the <strong>I</strong> form. <code>ret</code>/<code>sys</code>/<code>hlt</code>/<code>brk</code>
-      are opcode-only (every other field zero). A couple of details worth knowing when you read disassembly:</p>
+      (and the privileged <code>sret</code>/<code>hret</code>/<code>hcall</code>) are opcode-only (every other field zero). A couple of details worth knowing when you read disassembly:</p>
     <ul class="list">
       <li><strong>Immediate extension.</strong> <code>addi</code>, <code>slti</code>, <code>sltiu</code>, <code>cmpi</code> and every load/store offset <strong>sign-extend</strong> the 16-bit immediate; <code>andi</code>, <code>ori</code>, <code>xori</code> <strong>zero-extend</strong> it.</li>
       <li><strong>Branch offsets are relative and scaled.</strong> The 25-bit immediate is sign-extended, multiplied by 4, and added to the branch's <em>own</em> address. Targets are word-aligned.</li>
@@ -257,14 +260,79 @@ sw   r1, [sp, 8]</pre>
     <table>
       <tr><th>code</th><th>fault</th></tr>
       <tr><td class="num">1</td><td class="d">misaligned instruction fetch (<code>pc</code> not a multiple of 4)</td></tr>
-      <tr><td class="num">2</td><td class="d">out-of-bounds memory access (address at or past the 2&nbsp;MiB window)</td></tr>
+      <tr><td class="num">2</td><td class="d">memory access the machine rejected - out of bounds, or an unmapped or protected page</td></tr>
       <tr><td class="num">3</td><td class="d">illegal / unknown opcode</td></tr>
       <tr><td class="num">4</td><td class="d">divide or remainder by zero</td></tr>
     </table>
   </section>
 
+  <section id="priv">
+    <h2><span class="n">06</span>Privileged extension (TB32-V)</h2>
+    <p>Everything above is the unprivileged core: one flat privilege level, with the CPU handing faults straight
+      back to whatever runs it. <strong>TB32-V</strong> is an optional extension that makes TB32
+      <em>virtualizable</em> - privilege levels, control registers, in-CPU traps, two-stage paging, and timers -
+      modeled on the RISC-V hypervisor extension. TonicBoxOS uses only the core; a machine opts into TB32-V by
+      running the privileged executor. It is what the
+      <a href="https://github.com/Tonic-Box/tb32hv">tb32hv</a> hypervisor is built on.</p>
+
+    <p><strong>Privilege modes.</strong> Three levels - user (U), supervisor (S), hypervisor (H) - plus a
+      virtualization bit. When it is set, the running S/U pair is a <em>guest</em>: VS (guest kernel) and VU
+      (guest user). A trap moves up the ladder; <code>sret</code>/<code>hret</code> return down it.</p>
+    <table>
+      <tr><th>mode</th><th>runs</th></tr>
+      <tr><td class="op">H</td><td class="d">the hypervisor</td></tr>
+      <tr><td class="op">VS</td><td class="d">a guest kernel (virtualized supervisor)</td></tr>
+      <tr><td class="op">VU</td><td class="d">a guest user process (virtualized user)</td></tr>
+      <tr><td class="op">S / U</td><td class="d">a supervisor / user running without virtualization</td></tr>
+    </table>
+
+    <p><strong>Privileged instructions.</strong> <code>csrr</code> and <code>csrw</code> reuse the <strong>I</strong>
+      form, with the 16-bit immediate carrying the control-register number. Accessing a register above the current
+      privilege traps.</p>
+    <table>
+      <tr><th>op</th><th>form</th><th>effect</th><th>enc</th></tr>
+      <tr><td class="op"><code>csrr</code></td><td class="a">rd, csr</td><td class="d">read a control register: <code>rd = CSR[csr]</code></td><td class="num">53</td></tr>
+      <tr><td class="op"><code>csrw</code></td><td class="a">csr, rs</td><td class="d">write a control register: <code>CSR[csr] = rs</code></td><td class="num">54</td></tr>
+      <tr><td class="op"><code>sret</code></td><td class="a"></td><td class="d">return from a supervisor trap - restore mode and pc from the S bank</td><td class="num">55</td></tr>
+      <tr><td class="op"><code>hret</code></td><td class="a"></td><td class="d">return from a hypervisor trap</td><td class="num">56</td></tr>
+      <tr><td class="op"><code>hcall</code></td><td class="a"></td><td class="d">hypercall - trap from a guest into the hypervisor</td><td class="num">57</td></tr>
+    </table>
+
+    <p><strong>Control &amp; status registers.</strong> Each level has its own bank; when virtualized, the
+      supervisor bank is the guest's. Selected registers:</p>
+    <table>
+      <tr><th>csr</th><th>num</th><th>holds</th></tr>
+      <tr><td class="op"><code>sstatus</code></td><td class="num">100</td><td class="d">supervisor status: interrupt-enable, previous privilege</td></tr>
+      <tr><td class="op"><code>sflags</code></td><td class="num">101</td><td class="d">the condition flags (Z/N/C/V), so they can be saved across a context switch</td></tr>
+      <tr><td class="op"><code>sie sip</code></td><td class="num">104 144</td><td class="d">supervisor interrupt enable / pending</td></tr>
+      <tr><td class="op"><code>stvec</code></td><td class="num">105</td><td class="d">supervisor trap vector</td></tr>
+      <tr><td class="op"><code>sepc scause stval</code></td><td class="num">141-143</td><td class="d">saved pc / cause / aux, written on a trap to S</td></tr>
+      <tr><td class="op"><code>stimecmp</code></td><td class="num">14D</td><td class="d">supervisor timer compare</td></tr>
+      <tr><td class="op"><code>satp</code></td><td class="num">180</td><td class="d">stage-1 page-table base (a guest's own paging)</td></tr>
+      <tr><td class="op"><code>hstatus</code></td><td class="num">600</td><td class="d">hypervisor status, including the virtualization bit</td></tr>
+      <tr><td class="op"><code>hedeleg</code></td><td class="num">602</td><td class="d">which guest exceptions are delegated to the guest kernel</td></tr>
+      <tr><td class="op"><code>htvec</code></td><td class="num">605</td><td class="d">hypervisor trap vector</td></tr>
+      <tr><td class="op"><code>hepc hcause htval htinst</code></td><td class="num">641-64A</td><td class="d">saved pc / cause / faulting guest-physical address / trapping instruction</td></tr>
+      <tr><td class="op"><code>htimecmp</code></td><td class="num">64D</td><td class="d">hypervisor timer compare (preemptive scheduling)</td></tr>
+      <tr><td class="op"><code>hgatp</code></td><td class="num">680</td><td class="d">stage-2 page-table base (guest-physical to host-physical)</td></tr>
+    </table>
+
+    <p><strong>Traps &amp; delegation.</strong> A trap records its cause, pc, and an aux value, switches up a
+      privilege level, and jumps to that level's vector. <code>hedeleg</code> lets a guest user's syscalls and
+      stage-1 page faults be delivered straight to the guest kernel, while the guest kernel's privileged
+      operations, device access, and stage-2 faults trap to the hypervisor. Interrupt causes are marked by the
+      high bit; a hypervisor timer (<code>htimecmp</code>) can preempt a running guest.</p>
+
+    <p><strong>Two-stage translation.</strong> With a guest running, every address is translated twice:
+      <strong>stage-1</strong> (<code>satp</code>, the guest's own page tables) maps guest-virtual to
+      guest-physical, then <strong>stage-2</strong> (<code>hgatp</code>, the hypervisor's tables) maps
+      guest-physical to host-physical. Stage-2 is where isolation lives - a guest cannot reach memory its stage-2
+      does not map, whatever its own tables say - and an unmapped guest-physical address faults to the hypervisor,
+      which is how a guest's virtual devices (a UART, a timer) are trapped and emulated.</p>
+  </section>
+
   <section id="pseudo">
-    <h2><span class="n">06</span>Pseudo-instructions</h2>
+    <h2><span class="n">07</span>Pseudo-instructions</h2>
     <p>Conveniences the assembler expands to real instructions.</p>
     <table>
       <tr><th>write</th><th>expands to</th></tr>
@@ -278,7 +346,7 @@ sw   r1, [sp, 8]</pre>
   </section>
 
   <section id="asm">
-    <h2><span class="n">07</span>Assembler syntax</h2>
+    <h2><span class="n">08</span>Assembler syntax</h2>
     <p>One instruction or directive per line. Operands are comma-separated. Comments run to end of line after
       <code>;</code>, <code>//</code>, or <code>#</code>.</p>
     <ul class="list">
