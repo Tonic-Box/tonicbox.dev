@@ -190,6 +190,7 @@
 
   function stage(bytes) {
     var b = (bytes instanceof Uint8Array) ? bytes : Uint8Array.from(bytes);
+    if (b.length > 65536) b = b.subarray(0, 65536);
     new Uint8Array(wasm.memory.buffer, wasm.image_ptr(), b.length).set(b);
     return b.length;
   }
@@ -701,25 +702,25 @@
 
   var saveTimer = null;
   function saveFS() {
-    if (!persistOn || !wasm || !wasm.fs_snapshot || saveTimer) return;
+    if (!persistOn || !wasm || !wasm.disk_ptr || !wasm.disk_len || saveTimer) return;
     saveTimer = setTimeout(function () { saveTimer = null; doSaveFS(); }, 600);
   }
   function doSaveFS() {
     try {
-      var n = wasm.fs_snapshot();
-      var bytes = new Uint8Array(wasm.memory.buffer, wasm.image_ptr(), n).slice();
+      var n = wasm.disk_len();
+      var bytes = new Uint8Array(wasm.memory.buffer, wasm.disk_ptr(), n).slice();
       localStorage.setItem(PKEY, b64enc(bytes));
     } catch (e) {}
   }
   function restoreFS() {
-    if (!persistOn || !wasm || !wasm.fs_restore) return;
+    if (!persistOn || !wasm || !wasm.disk_ptr || !wasm.disk_len) return;
     try {
       var b = localStorage.getItem(PKEY);
       if (!b) return;
       var bytes = b64dec(b);
-      if (!wasm.disk_len || bytes.length !== wasm.disk_len()) { localStorage.removeItem(PKEY); return; }
-      new Uint8Array(wasm.memory.buffer, wasm.image_ptr(), bytes.length).set(bytes);
-      wasm.fs_restore(bytes.length);
+      if (bytes.length !== wasm.disk_len()) { localStorage.removeItem(PKEY); return; }
+      new Uint8Array(wasm.memory.buffer, wasm.disk_ptr(), bytes.length).set(bytes);
+      if (wasm.mark_restored) wasm.mark_restored();
     } catch (e) {}
   }
   function wirePersist() {
