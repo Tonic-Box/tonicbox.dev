@@ -188,8 +188,12 @@
     <p>These run inside the shell itself rather than as separate programs:</p>
     <table>
       <tr><th>Builtin</th><th>Effect</th></tr>
-      <tr><td class="k"><code>cd [DIR]</code></td><td class="desc">change directory; no argument goes to your home</td></tr>
+      <tr><td class="k"><code>cd [DIR]</code></td><td class="desc">change directory; no argument goes to your home, <code>-</code> to the previous directory</td></tr>
       <tr><td class="k"><code>exit [N]</code></td><td class="desc">leave the shell with status <code>N</code></td></tr>
+      <tr><td class="k"><code>break [N]</code> / <code>continue [N]</code></td><td class="desc">exit or restart the enclosing loop (N levels)</td></tr>
+      <tr><td class="k"><code>return [N]</code></td><td class="desc">return from a function with status <code>N</code></td></tr>
+      <tr><td class="k"><code>shift [N]</code></td><td class="desc">drop the first <code>N</code> positional parameters (default 1)</td></tr>
+      <tr><td class="k"><code>set [--] ARGS</code></td><td class="desc">set the positional parameters</td></tr>
       <tr><td class="k"><code>export NAME[=VAL]</code></td><td class="desc">put a variable into the environment for child programs</td></tr>
       <tr><td class="k"><code>unset NAME</code></td><td class="desc">remove a variable</td></tr>
       <tr><td class="k"><code>read VAR</code></td><td class="desc">read one line of input into <code>VAR</code> (status 1 at end of input)</td></tr>
@@ -204,8 +208,10 @@
       Anything else is resolved as an alias, then a builtin, then a function, then an external program (found via
       <code>execvp</code> on <code>$PATH</code>). <code>test</code> / <code>[</code> understand
       <code>-z</code> / <code>-n</code> (empty / non-empty string), <code>-e</code> / <code>-f</code> /
-      <code>-d</code> (path exists / is a file / is a directory), string <code>=</code> and <code>!=</code>,
-      and the integer comparisons <code>-eq -ne -lt -le -gt -ge</code>, plus <code>! EXPR</code> (negate) and a bare <code>STRING</code> (true when non-empty).
+      <code>-d</code> (path exists / is a file / is a directory), <code>-r</code> / <code>-w</code> / <code>-x</code> / <code>-s</code>
+      (readable / writable / executable / non-empty), string <code>=</code> and <code>!=</code>,
+      the integer comparisons <code>-eq -ne -lt -le -gt -ge</code>, <code>! EXPR</code> (negate),
+      <code>-a</code> / <code>-o</code> (and / or), and a bare <code>STRING</code> (true when non-empty).
     </p>
   </section>
 
@@ -223,6 +229,7 @@
       <tr><td class="k"><code>$0</code> &hellip; <code>$9</code></td><td class="desc">positional parameters (script name / arguments)</td></tr>
       <tr><td class="k"><code>$#</code></td><td class="desc">number of positional parameters</td></tr>
       <tr><td class="k"><code>$@</code> / <code>$*</code></td><td class="desc">all positional parameters, space-separated</td></tr>
+      <tr><td class="k"><code>$$</code> / <code>$!</code></td><td class="desc">shell PID / PID of the last background command</td></tr>
     </table>
     <pre><span class="c">$</span> name=world
 <span class="c">$</span> echo "hello, $name (last status $?)"
@@ -241,10 +248,12 @@ hello, world (last status 0)</pre>
     </p>
     <table>
       <tr><th>Expansion</th><th>Does</th></tr>
-      <tr><td class="k"><code>$(command)</code></td><td class="desc">substitutes the command's output (trailing newlines trimmed)</td></tr>
-      <tr><td class="k"><code>$(( expr ))</code></td><td class="desc">integer arithmetic: <code>+ - * / %</code>, unary <code>-</code>, parentheses, and variable names</td></tr>
-      <tr><td class="k"><code>*</code></td><td class="desc">matches any run of characters in one directory</td></tr>
-      <tr><td class="k"><code>?</code></td><td class="desc">matches a single character</td></tr>
+      <tr><td class="k"><code>$(command)</code> / <code>`command`</code></td><td class="desc">substitutes the command's output (trailing newlines trimmed); may contain pipes and functions</td></tr>
+      <tr><td class="k"><code>$(( expr ))</code></td><td class="desc">integer arithmetic (arithmetic operator set as in Limits)</td></tr>
+      <tr><td class="k"><code>${NAME:-w}</code> / <code>:=</code> / <code>:+</code></td><td class="desc">default, assign-default, or alternate value</td></tr>
+      <tr><td class="k"><code>${#NAME}</code></td><td class="desc">length of the value</td></tr>
+      <tr><td class="k"><code>${NAME#pat}</code> / <code>##</code> / <code>%</code> / <code>%%</code></td><td class="desc">strip a matching prefix or suffix</td></tr>
+      <tr><td class="k"><code>*</code> / <code>?</code> / <code>[...]</code></td><td class="desc">glob: any run, a single character, or a character class</td></tr>
     </table>
     <pre><span class="c">$</span> echo "there are $(ls *.c | wc -l) sources"
 <span class="c">$</span> echo $(( (3 + 4) * 2 ))
@@ -337,10 +346,9 @@ hi, world</pre>
   <section id="limits">
     <h2><span class="n">08</span>Limits</h2>
     <ul class="list">
-      <li><strong>Arithmetic is integer-only.</strong> <code>$(( ))</code> has no comparison, bitwise, or assignment operators; division or modulo by zero yields 0.</li>
-      <li><strong>Globbing is <code>*</code> and <code>?</code> only.</strong> There are no <code>[...]</code> character classes, brace <code>{}</code> expansion, or general <code>~</code> expansion (bare <code>cd</code> still goes home).</li>
-      <li><strong>No here-documents or process substitution.</strong> Redirection is otherwise complete - <code>&lt;</code>, <code>&gt;</code>, <code>&gt;&gt;</code>, <code>2&gt;</code>, any <code>N&gt;</code>, <code>2&gt;&amp;1</code>, <code>&amp;&gt;</code>, <code>&lt;&gt;</code>, and <code>&gt;&amp;-</code> - but there is no <code>&lt;&lt;</code> here-document or <code>&lt;(...)</code> process substitution.</li>
-      <li><strong>Leading assignments persist.</strong> <code>NAME=VAL cmd</code> sets the variable in the shell rather than scoping it to that single command.</li>
+      <li><strong>Arithmetic is integer-only.</strong> <code>$(( ))</code> supports <code>+ - * / % &amp; | ^ &lt;&lt; &gt;&gt; ~</code>, the comparisons <code>&lt; &gt; &lt;= &gt;= == !=</code>, <code>&amp;&amp;</code> / <code>||</code>, unary <code>-</code>, parentheses, and hex/octal literals, but has no assignment operators; division or modulo by zero yields 0.</li>
+      <li><strong>Globbing.</strong> <code>*</code>, <code>?</code>, and <code>[...]</code> character classes are supported, and <code>~</code> / <code>~/path</code> expand to your home. There is no brace <code>{}</code> expansion or <code>~user</code> form.</li>
+      <li><strong>No process substitution.</strong> Redirection is otherwise complete - <code>&lt;</code>, <code>&gt;</code>, <code>&gt;&gt;</code>, <code>2&gt;</code>, any <code>N&gt;</code>, <code>2&gt;&amp;1</code>, <code>&amp;&gt;</code>, <code>&lt;&gt;</code>, <code>&gt;&amp;-</code>, <code>&lt;&lt;</code> here-documents, and <code>&lt;&lt;&lt;</code> here-strings - but there is no <code>&lt;(...)</code> process substitution.</li>
       <li><strong>Capacities.</strong> Up to 64 variables and 64 aliases (names &le; 31 chars, values &le; 255), 32 functions, 16 positional parameters, and a 16 KB command line; <code>while</code> / <code>until</code> loops stop after 100000 iterations.</li>
     </ul>
   </section>

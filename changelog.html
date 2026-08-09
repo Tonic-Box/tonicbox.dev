@@ -81,6 +81,42 @@
 
     <div class="entry">
       <div class="entry-head">
+        <span class="date">2026-08-08</span>
+        <h2>Hypervisor migration, a faster runtime, and a broad correctness pass</h2>
+      </div>
+      <p class="sum">A large release. TonicBoxOS moved onto a Type-1 hypervisor, gained a runtime JIT and an optimizing compiler for real speed, and went through a wide shell, utility, and compiler correctness pass. Manual pages are now real, file-based man pages. See the updated <a class="ref" href="/arch.html">architecture</a> writeup.</p>
+
+      <div class="grp added">
+        <span class="label">Added</span>
+        <ul>
+          <li><strong>Hypervisor-hosted OS</strong>: the whole system now runs as a single de-privileged guest under <a class="ref" href="https://github.com/Tonic-Box/tb32hv">tb32hv</a>, a Type-1 hypervisor compiled to WebAssembly. The kernel runs in guest-supervisor mode and userland in guest-user mode, isolated by two-stage nested paging.</li>
+          <li><strong>Runtime JIT and optimizing compiler</strong>: the hypervisor's CPU compiles hot guest code to WebAssembly at runtime, and the toolchain gained an optimizing pass (<code>-O</code>), so programs and games run substantially faster.</li>
+          <li><strong>Shell</strong>: word-splitting, subshells <code>( )</code>, command substitution with pipes and functions, backticks, here-documents and here-strings, <code>break</code>/<code>continue</code>/<code>return</code>/<code>shift</code>/<code>set</code>, <code>${VAR:-default}</code>-style parameter expansion, full comparison/bitwise/shift arithmetic, <code>[...]</code> globs, and more <code>test</code> operators.</li>
+          <li><strong>Utilities</strong>: real regular expressions in <code>grep</code>, <code>sort -k</code>/<code>-t</code>, <code>cp -r</code>, <code>mkdir -p</code>, <code>rm -f</code>, symbolic <code>chmod</code>, <code>printf</code> field widths, and flag support across <code>id</code>, <code>uname</code>, <code>date</code>, <code>ls</code>, <code>head</code>, <code>tail</code>, and others.</li>
+          <li><strong>Manual pages</strong>: <code>man</code> now serves real sectioned pages (NAME / SYNOPSIS / DESCRIPTION / OPTIONS) read from a database in the filesystem.</li>
+        </ul>
+      </div>
+
+      <div class="grp improved">
+        <span class="label">Improved</span>
+        <ul>
+          <li>A real-time clock replaces the instruction-counted one, fixing a freeze during long play sessions and giving smoother frame pacing.</li>
+          <li>Copy-on-write <code>fork</code> and wider memory access cut per-command overhead, so the shell feels snappier.</li>
+        </ul>
+      </div>
+
+      <div class="grp fixed">
+        <span class="label">Fixed</span>
+        <ul>
+          <li>Data safety: <code>cp FILE FILE</code> and <code>mv FILE FILE</code> no longer destroy the file, <code>mv</code> onto an existing file replaces it correctly, and <code>kill</code> with a non-numeric argument no longer ends the session.</li>
+          <li>The optimizing compiler no longer miscompiles programs that initialize a local from a live parameter, and external commands now report their exit status to <code>$?</code>.</li>
+          <li><code>cd</code> through a symlink lands in a usable directory, and terminal size is reported to programs (<code>TIOCGWINSZ</code>) so full-screen apps and games size to the window.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="entry">
+      <div class="entry-head">
         <span class="date">2026-08-01</span>
         <h2>Real virtual memory: paging, copy-on-write fork, and mmap</h2>
       </div>

@@ -271,9 +271,10 @@ sw   r1, [sp, 8]</pre>
     <p>Everything above is the unprivileged core: one flat privilege level, with the CPU handing faults straight
       back to whatever runs it. <strong>TB32-V</strong> is an optional extension that makes TB32
       <em>virtualizable</em> - privilege levels, control registers, in-CPU traps, two-stage paging, and timers -
-      modeled on the RISC-V hypervisor extension. TonicBoxOS uses only the core; a machine opts into TB32-V by
-      running the privileged executor. It is what the
-      <a href="https://github.com/Tonic-Box/tb32hv">tb32hv</a> hypervisor is built on.</p>
+      modeled on the RISC-V hypervisor extension. A machine opts into TB32-V by running the privileged executor:
+      it is what the <a href="https://github.com/Tonic-Box/tb32hv">tb32hv</a> hypervisor is built on, and
+      <a href="arch.html">TonicBoxOS</a> now runs as a guest kernel under it - so the OS you use exercises the
+      full extension, not just the core.</p>
 
     <p><strong>Privilege modes.</strong> Three levels - user (U), supervisor (S), hypervisor (H) - plus a
       virtualization bit. When it is set, the running S/U pair is a <em>guest</em>: VS (guest kernel) and VU
@@ -302,7 +303,7 @@ sw   r1, [sp, 8]</pre>
       supervisor bank is the guest's. Selected registers:</p>
     <table>
       <tr><th>csr</th><th>num</th><th>holds</th></tr>
-      <tr><td class="op"><code>sstatus</code></td><td class="num">100</td><td class="d">supervisor status: interrupt-enable, previous privilege</td></tr>
+      <tr><td class="op"><code>sstatus</code></td><td class="num">100</td><td class="d">supervisor status: interrupt-enable, previous privilege, and user-memory access (SUM)</td></tr>
       <tr><td class="op"><code>sflags</code></td><td class="num">101</td><td class="d">the condition flags (Z/N/C/V), so they can be saved across a context switch</td></tr>
       <tr><td class="op"><code>sie sip</code></td><td class="num">104 144</td><td class="d">supervisor interrupt enable / pending</td></tr>
       <tr><td class="op"><code>stvec</code></td><td class="num">105</td><td class="d">supervisor trap vector</td></tr>
@@ -329,6 +330,12 @@ sw   r1, [sp, 8]</pre>
       guest-physical to host-physical. Stage-2 is where isolation lives - a guest cannot reach memory its stage-2
       does not map, whatever its own tables say - and an unmapped guest-physical address faults to the hypervisor,
       which is how a guest's virtual devices (a UART, a timer) are trapped and emulated.</p>
+
+    <p><strong>Page permissions.</strong> Each stage-1 page grants read/write/execute and carries a
+      <em>user</em> (U) bit. User mode may only reach U pages; supervisor mode may not read or write a U page
+      unless <code>sstatus.SUM</code> is set - which is how a kernel copies a process's syscall buffers across the
+      privilege boundary - and it never executes one, so kernel and user memory stay separated within a single
+      address space.</p>
   </section>
 
   <section id="pseudo">

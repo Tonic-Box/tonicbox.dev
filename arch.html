@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Architecture - TonicBoxOS</title>
-<meta name="description" content="How TonicBoxOS is built: a native Zig kernel compiled to WebAssembly running an interpreted TB32 userland, with real processes, signals, a monolithic driver/VFS layer, and a self-hosting toolchain - plus its design limits.">
+<meta name="description" content="How TonicBoxOS is built: a Type-1 hypervisor (tb32hv) compiled to WebAssembly hosts a guest OS whose kernel and userland are both TB32 machine code, with real processes, signals, a monolithic driver/VFS layer, and a self-hosting toolchain - plus its design limits.">
 <link rel="canonical" href="https://tonicbox.dev/arch.html">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230b0e14'/><text x='2' y='12' font-family='monospace' font-size='11' fill='%237aa2f7'>&gt;_</text></svg>">
 <link rel="stylesheet" href="docs.css?v=1">
@@ -100,13 +100,14 @@
     <div class="eyebrow">TonicBoxOS &middot; architecture</div>
     <h1><span class="accent">Architecture</span> &amp; limits</h1>
     <p class="lede">
-      A complete operating system that runs in a browser tab. A Zig kernel, compiled to WebAssembly, runs an
-      interpreted userland for a custom 32-bit ISA (TB32). The kernel is native code; userland reaches it only
-      across a system-call boundary.
+      A complete operating system that runs in a browser tab. A Type-1 hypervisor (<a href="https://github.com/Tonic-Box/tb32hv">tb32hv</a>),
+      compiled to WebAssembly, hosts a single guest: TonicBoxOS. The guest's kernel and userland are both
+      machine code for a custom 32-bit ISA (<a href="as.html">TB32</a>), executed by the hypervisor's CPU. The
+      kernel runs de-privileged in guest-supervisor mode; userland reaches it only across a system-call boundary.
     </p>
     <div class="meta">
-      <span class="chip"><b>kernel</b> Zig to WASM</span>
-      <span class="chip"><b>userland</b> interpreted TB32</span>
+      <span class="chip"><b>host</b> tb32hv to WASM</span>
+      <span class="chip"><b>guest</b> TB32 kernel (VS) + userland (VU)</span>
       <span class="chip"><b>processes</b> fork / exec / wait</span>
       <span class="chip"><b>drivers</b> monolithic VFS</span>
     </div>
@@ -122,23 +123,26 @@
 
   <section id="stack">
     <h2><span class="n">00</span>The stack</h2>
-    <p>Three layers:</p>
+    <p>Four layers. Only the top one is native code; everything below it is TB32 machine code the CPU executes:</p>
     <table>
       <tr><th>Layer</th><th>What it is</th></tr>
-      <tr><td class="k">host</td><td class="desc">a JavaScript shim: feeds input, paints an output buffer to the screen, and ticks the kernel while idle</td></tr>
-      <tr><td class="k">kernel</td><td class="desc"><code>tbvm.wasm</code>, native WebAssembly: scheduler, process table, signals, filesystem, drivers</td></tr>
-      <tr><td class="k">userland</td><td class="desc">TB32 code, interpreted per instruction; each process runs in its own isolated 16&nbsp;MiB paged address space</td></tr>
+      <tr><td class="k">host</td><td class="desc">a JavaScript shim: feeds input, paints an output buffer to the screen, and ticks the hypervisor while idle</td></tr>
+      <tr><td class="k">hypervisor</td><td class="desc"><code>tb32hv.wasm</code>, native WebAssembly: the TB32-V CPU that interprets the guest - with a WebAssembly JIT that compiles hot code blocks at runtime - the device model (console, block device, RTC, RNG), and a small VM manager. It runs one guest, isolated by two-stage nested paging</td></tr>
+      <tr><td class="k">guest kernel</td><td class="desc">TB32 machine code, run in <strong>guest-supervisor (VS)</strong> mode: scheduler, process table, signals, filesystem, drivers, syscall dispatch</td></tr>
+      <tr><td class="k">userland</td><td class="desc">TB32 machine code, run in <strong>guest-user (VU)</strong> mode; each process in its own isolated paged address space</td></tr>
     </table>
     <p>
       Userland enters the kernel only through a <code>SYS</code> instruction, with the call number in
-      <code>r7</code>. Each process has its own page table, so address spaces are isolated: there is no
-      shared memory and no virtual address that reaches another process or the kernel. Pages are
-      allocated on first touch (demand-zero) from a physical frame pool, and <code>fork</code> shares
-      them copy-on-write.
+      <code>r7</code>: the CPU takes a trap and hands it to the guest kernel. Each process has its own
+      page table, so address spaces are isolated - there is no shared memory and no virtual address that
+      reaches another process or the kernel. Pages are allocated on first touch (demand-zero) from a
+      physical frame pool, and <code>fork</code> shares them copy-on-write. A second translation stage
+      (guest-physical to host-physical) walls the whole VM off from the host, the same way the
+      <a href="https://github.com/Tonic-Box/tb32hv">tb32hv</a> hypervisor isolates any guest.
     </p>
     <figure>
-      <img src="arch-runtime.svg" alt="Three stacked layers: the browser host (JavaScript driver) exchanges bytes with the tbvm.wasm native Zig kernel; below a dashed syscall boundary sits the TB32 userland, where init (PID 1) forks and execs syslogd, the login shell -sh, and commands, each in its own isolated 16 MiB paged address space.">
-      <figcaption>Host, kernel, and an isolated userland across the syscall boundary.</figcaption>
+      <img src="arch-runtime.svg" alt="Four stacked layers: the browser host (JavaScript driver) exchanges bytes and MMIO with the tb32hv.wasm Type-1 hypervisor, which interprets one guest under two-stage nested paging. Inside the guest, a kernel runs in VS mode (scheduler, filesystem, drivers, syscall dispatch); below it, in VU mode across a syscall boundary, init (PID 1) forks and execs syslogd, the login shell -sh, and commands, each in its own isolated paged address space.">
+      <figcaption>Host, hypervisor, and an isolated guest whose kernel and userland run at different privilege levels.</figcaption>
     </figure>
   </section>
 
@@ -146,8 +150,8 @@
     <h2><span class="n">01</span>Processes</h2>
     <p>
       <code>fork</code> copies a process copy-on-write into a fresh address space; <code>exec</code> replaces the image in place;
-      <code>wait</code> reaps children. Scheduling is <strong>preemptive round-robin</strong>: each runnable
-      process gets a fixed instruction quantum (200k instructions) per turn, so daemons and background jobs
+      <code>wait</code> reaps children. Scheduling is <strong>preemptive round-robin</strong>: a hardware
+      timer preempts each runnable process after a fixed instruction quantum, so daemons and background jobs
       advance while the shell waits at a prompt.
     </p>
     <p>
@@ -206,10 +210,10 @@
     <table>
       <tr><th>Area</th><th>Limit</th></tr>
       <tr><td class="k">processes</td><td class="desc">a fixed pool of process slots; beyond it, spawns are refused rather than queued</td></tr>
-      <tr><td class="k">memory</td><td class="desc">each process has a 16&nbsp;MiB paged virtual address space (4&nbsp;KiB pages, demand-zero, copy-on-write fork, <code>mmap</code>/<code>mprotect</code>); pages are backed by a shared physical frame pool, so total live memory across all processes is bounded by the pool</td></tr>
-      <tr><td class="k">filesystem</td><td class="desc">an in-memory inode/block ramdisk with a fixed inode count and a fixed number of data blocks; state is per-session (reset on reload, or saved to the browser)</td></tr>
+      <tr><td class="k">memory</td><td class="desc">each process has its own paged virtual address space (4&nbsp;KiB pages, demand-zero, copy-on-write fork, <code>mmap</code>/<code>mprotect</code>); pages are backed by a shared physical frame pool, so total live memory across all processes is bounded by the pool</td></tr>
+      <tr><td class="k">filesystem</td><td class="desc">an inode/block filesystem on a virtual block device, with a fixed inode count and a fixed number of data blocks; state is per-session (reset on reload, or saved to the browser)</td></tr>
       <tr><td class="k">arguments</td><td class="desc">a command takes a bounded number of arguments</td></tr>
-      <tr><td class="k">streams</td><td class="desc">a pipe is a bounded ring buffer (64&nbsp;KiB); a full pipe blocks the writer until the reader drains it, so large streams flow through without loss</td></tr>
+      <tr><td class="k">streams</td><td class="desc">a pipe is a bounded ring buffer; a full pipe blocks the writer until the reader drains it, so large streams flow through without loss</td></tr>
       <tr><td class="k">compiler</td><td class="desc">TBC is a subset: no floats or structs. It does have enums, typedef, multidimensional arrays with brace initializers, a <code>#if</code>/macro preprocessor, and a malloc/mem*/str* prelude; function pointers are supported (untyped)</td></tr>
       <tr><td class="k">shell</td><td class="desc">functions are scoped to a single command line and do not persist across prompts</td></tr>
     </table>

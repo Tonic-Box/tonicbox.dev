@@ -2,3 +2,4 @@ zig/
 libtb32/
 tb32emu/
 tb32hv/
+tbvm.wasm

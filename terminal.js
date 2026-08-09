@@ -14,9 +14,33 @@
   var ASCII = "  ╱|、\n(˚ˎ 。7\n|、˜〵\nじしˍ,)ノ";
   var enc = new TextEncoder();
   var dec = new TextDecoder();
+  var odec = new TextDecoder();
   var wasm = null;
   var COLS = 80, ROWS = 24;
   var emu = null;
+
+  // JIT block compiler: drain the guest's hot-block queue, compiling each into a tiny wasm module
+  // that shares the guest memory and installing it into the exported table for run_jit to dispatch.
+  // Slots are recycled round-robin (jit_bind rebinds the owner, retiring the old block safely), and
+  // only a few blocks are compiled per drain so a burst never stalls a frame.
+  var jitSlot = 0;
+  function jitDrain() {
+    if (!wasm || !wasm.jit_next_hot || !wasm.__indirect_function_table) return;
+    var slots = wasm.jit_slots(), budget = 32, fpa;
+    while (budget-- > 0 && (fpa = wasm.jit_next_hot()) !== 0) {
+      var len = wasm.jit_translate(fpa);
+      if (len === 0) { wasm.jit_mark_bad(fpa); continue; }
+      var clen = wasm.jit_last_clen();
+      var bytes = new Uint8Array(wasm.memory.buffer, wasm.jit_code_ptr(), len).slice();
+      var inst;
+      try { inst = new WebAssembly.Instance(new WebAssembly.Module(bytes), { env: { memory: wasm.memory } }); }
+      catch (e) { wasm.jit_mark_bad(fpa); continue; }
+      var slot = jitSlot; jitSlot = (jitSlot + 1) % slots;
+      wasm.__indirect_function_table.set(wasm.jit_slot_index(slot), inst.exports.b);
+      wasm.jit_bind(fpa, slot, clen);
+    }
+  }
+  function runJit(n) { var rc = wasm.run_jit(n); jitDrain(); return rc; }
 
   function esc(s) {
     return String(s).replace(/[&<>"]/g, function (c) {
@@ -172,9 +196,9 @@
 
   function pumpRender() {
     setClocks();
-    var rc = wasm.run(30000000), start = Date.now();
-    while (rc === 0 && Date.now() - start < 8000) rc = wasm.run(30000000);
-    var out = dec.decode(new Uint8Array(wasm.memory.buffer, wasm.out_ptr(), wasm.out_len()));
+    var rc = runJit(30000000), start = Date.now();
+    while (rc === 0 && Date.now() - start < 8000) rc = runJit(30000000);
+    var out = odec.decode(new Uint8Array(wasm.memory.buffer, wasm.out_ptr(), wasm.out_len()), { stream: true });
     if (out) emu.write(out);
     render();
     saveFS();
@@ -189,24 +213,50 @@
   }
 
   var held = {}, heldCount = 0, kbdLoopOn = false;
+  var REPEAT_DELAY = 300, REPEAT_RATE = 55;
+  function repNow() { return (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now(); }
+  // Software key-repeat for builds without a make/break input model: re-inject each held key's bytes
+  // on a typematic cadence (an initial delay, then a steady rate) so a held key produces continuous
+  // input while a quick tap fires exactly once. Each key repeats independently. Called from run loops.
+  function injectHeld() {
+    if (!wasm || wasm.key_make || heldCount <= 0) return;
+    var now = repNow();
+    for (var id in held) {
+      var h = held[id];
+      if (!h || !h.bytes || !h.bytes.length) continue;
+      if (now - h.pressed < REPEAT_DELAY) continue;
+      if (now - h.last < REPEAT_RATE) continue;
+      h.last = now;
+      wasm.stdin_push(stage(h.bytes));
+    }
+  }
   function kbdLoop() {
     if (!wasm || heldCount <= 0 || altActive) { kbdLoopOn = false; return; }
     setClocks();
     wasm.out_reset();
-    wasm.run(6000000);
-    var o = dec.decode(new Uint8Array(wasm.memory.buffer, wasm.out_ptr(), wasm.out_len()));
+    injectHeld();
+    runJit(6000000);
+    var o = odec.decode(new Uint8Array(wasm.memory.buffer, wasm.out_ptr(), wasm.out_len()), { stream: true });
     if (o) emu.write(o);
     render();
     requestAnimationFrame(kbdLoop);
   }
   function keyMake(id, bytes) {
     if (!wasm) return;
-    if (!wasm.key_make) { send(bytes); return; }
-    wasm.out_reset();
-    var n = stage(bytes);
-    wasm.key_make(id >>> 0, n);
-    pumpRender();
-    if (!held[id]) { held[id] = 1; heldCount++; if (!kbdLoopOn && !altActive) { kbdLoopOn = true; requestAnimationFrame(kbdLoop); } }
+    if (wasm.key_make) {
+      wasm.out_reset();
+      var n = stage(bytes);
+      wasm.key_make(id >>> 0, n);
+      pumpRender();
+    } else {
+      send(bytes);
+    }
+    if (!held[id]) {
+      var now = repNow();
+      held[id] = wasm.key_make ? 1 : { bytes: bytes, pressed: now, last: now };
+      heldCount++;
+      if (!kbdLoopOn && !altActive) { kbdLoopOn = true; requestAnimationFrame(kbdLoop); }
+    } else if (!wasm.key_make) held[id].bytes = bytes;
   }
   function keyBreak(id) {
     if (wasm && wasm.key_break) wasm.key_break(id >>> 0);
@@ -234,8 +284,8 @@
     if (wasm.set_winsize) wasm.set_winsize(ROWS, COLS);
     if (wasm.set_echo) wasm.set_echo(1);
     setClocks();
-    wasm.run(30000000);
-    var out = dec.decode(new Uint8Array(wasm.memory.buffer, wasm.out_ptr(), wasm.out_len()));
+    runJit(30000000);
+    var out = odec.decode(new Uint8Array(wasm.memory.buffer, wasm.out_ptr(), wasm.out_len()), { stream: true });
     if (out) emu.write(out);
     shadow = ""; histIdx = 0;
     render();
@@ -246,10 +296,10 @@
     if (!altActive || !wasm) return;
     setClocks();
     wasm.out_reset();
-    wasm.run(6000000);
-    var o = dec.decode(new Uint8Array(wasm.memory.buffer, wasm.out_ptr(), wasm.out_len()));
-    if (o) emu.write(o);
-    render();
+    injectHeld();
+    runJit(6000000);
+    var o = odec.decode(new Uint8Array(wasm.memory.buffer, wasm.out_ptr(), wasm.out_len()), { stream: true });
+    if (o) { emu.write(o); render(); }
     if (altActive) requestAnimationFrame(frame);
   }
 
@@ -303,7 +353,6 @@
     if (e.ctrlKey && e.shiftKey) return;
     var mode = inputMode();
     if (mode === "raw") {
-
       if (e.repeat) { e.preventDefault(); return; }
       var rb = keyBytes(e);
       if (rb) { e.preventDefault(); keyMake(e.keyCode, rb); }
@@ -387,7 +436,7 @@
     var b = enc.encode(dir === "" ? "." : dir);
     new Uint8Array(wasm.memory.buffer, wasm.image_ptr(), b.length).set(b);
     wasm.dir_list(b.length);
-    var out = dec.decode(new Uint8Array(wasm.memory.buffer, wasm.out_ptr(), wasm.out_len()));
+    var out = odec.decode(new Uint8Array(wasm.memory.buffer, wasm.out_ptr(), wasm.out_len()), { stream: true });
     var res = [];
     out.split("\n").forEach(function (ln) {
       if (!ln) return;
@@ -447,6 +496,10 @@
     var cmdpos = value.slice(segStart, ts).trim() === "";
 
     var entries, base;
+    if (token === "~") {
+      injectSuffix("~", "~/");
+      return;
+    }
     if (cmdpos && token.indexOf("/") < 0) {
       entries = commandNames()
         .filter(function (n) { return n.indexOf(token) === 0; })
@@ -602,8 +655,8 @@
     if (!wasm || booting || emu.isAlt()) return;
     setClocks();
     wasm.out_reset();
-    wasm.run(1500000);
-    var o = dec.decode(new Uint8Array(wasm.memory.buffer, wasm.out_ptr(), wasm.out_len()));
+    runJit(1500000);
+    var o = odec.decode(new Uint8Array(wasm.memory.buffer, wasm.out_ptr(), wasm.out_len()), { stream: true });
     if (o) { emu.write(o); render(); }
   }
 
@@ -664,6 +717,7 @@
       var b = localStorage.getItem(PKEY);
       if (!b) return;
       var bytes = b64dec(b);
+      if (!wasm.disk_len || bytes.length !== wasm.disk_len()) { localStorage.removeItem(PKEY); return; }
       new Uint8Array(wasm.memory.buffer, wasm.image_ptr(), bytes.length).set(bytes);
       wasm.fs_restore(bytes.length);
     } catch (e) {}
@@ -706,8 +760,10 @@
   emu = window.TBXVT.createTerminal(COLS, ROWS, {
     onOsc: function (payload) {
       if (payload.indexOf("tbxlogin") >= 0) {
-        emu.flushToScrollback();
-        drainScrollback();
+        // wipe the hypervisor/kernel boot chatter so the login screen starts clean
+        emu.dropScrollback();
+        emu.clearKeepCursorLine();
+        outputEl.innerHTML = "";
         renderLoginHeader();
       }
     }
@@ -718,7 +774,7 @@
   wirePersist();
   syncWinsize(false);
 
-  fetch("tbvm.wasm?v=3")
+  fetch((typeof window !== "undefined" && window.TB_WASM) || "tb32hv.wasm")
     .then(function (r) { return r.arrayBuffer(); })
     .then(function (buf) { return WebAssembly.instantiate(buf, {}); })
     .then(function (res) {
@@ -735,8 +791,8 @@
       if (wasm.set_winsize) wasm.set_winsize(ROWS, COLS);
       if (wasm.set_echo) wasm.set_echo(1);
       setClocks();
-      wasm.run(30000000);
-      var out = dec.decode(new Uint8Array(wasm.memory.buffer, wasm.out_ptr(), wasm.out_len()));
+      runJit(30000000);
+      var out = odec.decode(new Uint8Array(wasm.memory.buffer, wasm.out_ptr(), wasm.out_len()), { stream: true });
       if (out) emu.write(out);
       render();
       startLogin();
