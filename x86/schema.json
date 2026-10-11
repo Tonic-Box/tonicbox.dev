@@ -1,0 +1,393 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "x86 ISA dataset",
+  "type": "object",
+  "required": ["version", "conventions", "sources", "instructions"],
+  "properties": {
+    "version": { "type": "string", "description": "Dataset version, e.g. '2026.1'." },
+
+    "sources": {
+      "type": "array",
+      "description": "Global provenance: every source that contributed to this dataset.",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind"],
+        "properties": {
+          "id":      { "type": "string", "description": "Short id referenced by instruction.provenance entries, e.g. 'felix', 'xed', 'uops'." },
+          "kind":    { "type": "string", "enum": ["sdm-scrape", "xed", "uops.info", "amd-apm", "manual", "other"] },
+          "url":     { "type": "string" },
+          "version": { "type": "string", "description": "Source revision, e.g. SDM revision number or XED git sha." },
+          "fetched": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+
+    "conventions": {
+      "type": "object",
+      "description": "Normative rules this dataset follows. Consumers can rely on these — they are not descriptive.",
+      "required": [
+        "opcode_normalization",
+        "modes_completeness",
+        "boolean_absence",
+        "flags_absence",
+        "vendor_semantics",
+        "operand_size_forms",
+        "id_uniqueness"
+      ],
+      "properties": {
+        "opcode_normalization": {
+          "type": "string",
+          "const": "map_then_final_byte",
+          "description": "The 0F / 0F38 / 0F3A escape bytes MUST be encoded in encodings.prefix_map, never as leading bytes of encodings.opcode. So 0F B6 is always {prefix_map:'0F', opcode:'B6'} — never {prefix_map:'legacy', opcode:'0F B6'}."
+        },
+        "modes_completeness": {
+          "type": "string",
+          "const": "all_four_required",
+          "description": "instruction.modes MUST emit all four booleans (real, protected, long_64, compat_32). No implicit defaults."
+        },
+        "boolean_absence": {
+          "type": "string",
+          "const": "absent_means_false",
+          "description": "For optional booleans on encodings (modrm, rex_w, evex.broadcast, evex.sae, evex.rounding_control, operand.broadcast, operand.mask_allowed, operand.signed): absent MUST be treated as false. Emitters SHOULD omit false rather than write it explicitly, to keep files small; consumers MUST NOT distinguish absent from false."
+        },
+        "flags_absence": {
+          "type": "string",
+          "const": "absent_means_unchanged",
+          "description": "In instruction.flags, an absent key means the flag is unchanged. There is deliberately no 'unchanged' enum value."
+        },
+        "vendor_semantics": {
+          "type": "string",
+          "const": "baseline_plus_overrides",
+          "description": "An instruction's top-level fields are its BASELINE. The baseline describes Intel's documentation for any form Intel documents, and the sole implementing vendor otherwise. Where another vendor differs, instruction.vendor_overrides.<vendor> restates only the differing keys, and each key present there REPLACES the baseline key wholesale for that vendor (never merged). No override for a vendor means that vendor matches the baseline. instruction.vendor_exclusive is set only where single-vendor implementation is known; its absence records no claim either way."
+        },
+        "operand_size_forms": {
+          "type": "string",
+          "const": "one_form_per_effective_size",
+          "description": "16/32/64-bit variants of the same mnemonic MUST be separate instruction entries, distinguished by encoding.default_operand_size plus the operand_size_prefix / rex_w fields on their encodings. Do not collapse them into a single entry with a variable size."
+        },
+        "id_uniqueness": {
+          "type": "string",
+          "const": "globally_unique",
+          "description": "instruction.id MUST be unique across the entire instructions[] array. JSON Schema cannot enforce this; validators MUST check it as a pipeline step."
+        }
+      }
+    },
+
+    "groups": {
+      "type": "array",
+      "description": "Reusable groupings referenced from instruction.groups by id.",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "name"],
+        "properties": {
+          "id":          { "type": "string" },
+          "kind":        { "type": "string", "enum": ["isa_extension", "category", "family", "cpuid_feature"] },
+          "name":        { "type": "string" },
+          "description": { "type": "string" },
+          "parent":      { "type": "string" }
+        }
+      }
+    },
+
+    "instructions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/instruction" }
+    }
+  },
+
+  "$defs": {
+    "instruction": {
+      "type": "object",
+      "required": ["id", "mnemonic", "summary", "operands", "encodings", "modes"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique per (mnemonic, operand signature). MUST be globally unique across instructions[]; validators must check this — JSON Schema cannot express it. See conventions.id_uniqueness."
+        },
+        "mnemonic":     { "type": "string" },
+        "att_mnemonic": { "type": "string" },
+        "summary":      { "type": "string" },
+        "description":  { "type": "string" },
+        "pseudocode":   { "type": "string" },
+        "intrinsic":    { "type": "string" },
+
+        "groups": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+
+        "operands": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["role", "type"],
+            "properties": {
+              "role":          { "type": "string", "enum": ["read", "write", "readwrite", "cond_write"] },
+              "type":          { "type": "string", "enum": ["reg", "mem", "reg_or_mem", "imm", "rel", "moffs", "implicit"] },
+              "size_bits":     { "type": "integer" },
+              "reg_class":     { "type": "string", "enum": ["gpr", "gpr_high", "seg", "cr", "dr", "mmx", "xmm", "ymm", "zmm", "mask", "tmm", "st", "bnd"] },
+              "encoding_slot": { "type": "string", "enum": ["modrm.reg", "modrm.rm", "vex.vvvv", "evex.vvvv", "xop.vvvv", "opcode+r", "imm", "imm8_hi", "imm8_lo", "implicit", "rel"] },
+              "implicit_reg":  { "type": "string" },
+              "signed":        { "type": "boolean" },
+              "broadcast":     { "type": "boolean" },
+              "mask_allowed":  { "type": "boolean" }
+            }
+          }
+        },
+
+        "implicit_operands": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "role"],
+            "properties": {
+              "name": { "type": "string" },
+              "role": { "type": "string", "enum": ["read", "write", "readwrite", "cond_write"] }
+            }
+          }
+        },
+
+        "flags": { "$ref": "#/$defs/flags" },
+
+        "encodings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/encoding" }
+        },
+
+        "modes": { "$ref": "#/$defs/modes" },
+
+        "cpuid_features": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+
+        "vendor_exclusive": {
+          "type": "string",
+          "enum": ["intel", "amd"],
+          "description": "Present only when this form is known to be implemented by one vendor alone (e.g. VMX and SGX are Intel-only; SVM and XOP are AMD-only). Absence is NOT a claim that both vendors implement it — it means no exclusivity has been recorded. See conventions.vendor_semantics."
+        },
+
+        "vendor_overrides": {
+          "type": "object",
+          "description": "Vendor-specific deviations from this instruction's baseline fields. See conventions.vendor_semantics.",
+          "additionalProperties": false,
+          "properties": {
+            "intel": { "$ref": "#/$defs/vendor_override" },
+            "amd":   { "$ref": "#/$defs/vendor_override" }
+          }
+        },
+
+        "branch": {
+          "type": "object",
+          "properties": {
+            "kind":      { "type": "string", "enum": ["none", "jump", "cond_jump", "call", "ret", "iret", "int", "syscall", "sysret"] },
+            "target":    { "type": "string", "enum": ["direct", "indirect"] },
+            "condition": { "type": "string" }
+          }
+        },
+
+        "exceptions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["vector"],
+            "properties": {
+              "vector":    { "type": "string" },
+              "condition": { "type": "string" }
+            }
+          }
+        },
+
+        "performance": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["uarch"],
+            "properties": {
+              "uarch":             { "type": "string" },
+              "latency_cycles":    { "type": "number" },
+              "throughput_cycles": { "type": "number" },
+              "uops":              { "type": "integer" },
+              "ports":             { "type": "string" }
+            }
+          }
+        },
+
+        "provenance": {
+          "type": "array",
+          "description": "Per-instruction citations. Each entry points at a source declared in top-level sources[] and optionally a specific page/URL/section.",
+          "items": {
+            "type": "object",
+            "required": ["source"],
+            "properties": {
+              "source":  { "type": "string", "description": "Matches sources[].id." },
+              "url":     { "type": "string", "description": "Deep link, e.g. the felixcloutier.com page for this mnemonic." },
+              "page":    { "type": "string", "description": "SDM page reference, e.g. 'Vol 2A p.3-618'." },
+              "section": { "type": "string", "description": "SDM section, e.g. 'MOV—Move'." },
+              "note":    { "type": "string" }
+            }
+          }
+        },
+
+        "notes": { "type": "string" }
+      }
+    },
+
+    "encoding": {
+      "type": "object",
+      "required": ["prefix_map", "opcode"],
+      "properties": {
+        "prefix_map": {
+          "type": "string",
+          "enum": ["legacy", "0F", "0F38", "0F3A", "MAP4", "MAP5", "MAP6", "XOP8", "XOP9", "XOPA"],
+          "description": "Escape/opcode map. Required. Use 'legacy' for single-byte opcodes with no escape. See conventions.opcode_normalization."
+        },
+        "mandatory_prefix": {
+          "type": "string",
+          "enum": ["none", "66", "F2", "F3"]
+        },
+        "opcode": {
+          "type": "string",
+          "description": "Hex bytes of the primary opcode AFTER the map is stripped. For 0F B6, this is 'B6'. For 0F 38 F0, this is 'F0'."
+        },
+        "opcode_extension": { "type": "integer", "minimum": 0, "maximum": 7 },
+        "opcode_suffix": {
+          "type": "string",
+          "description": "Trailing byte AFTER the ModR/M (and any displacement) that selects the operation, rather than an immediate operand. Used by 3DNow!, whose forms all encode as 0F 0F /r <suffix>."
+        },
+        "modrm":            { "type": "boolean" },
+        "sib":              { "type": "string", "enum": ["never", "optional", "required"] },
+
+        "default_operand_size": {
+          "type": "integer",
+          "enum": [8, 16, 32, 64],
+          "description": "Default operand size for this encoding in its listed modes, before any size prefixes apply. Required for legacy encodings (no VEX/EVEX). Forbidden for VEX/EVEX encodings, where operand width comes from vex.length / evex.length and the element type from the opcode. Combined with operand_size_prefix and rex_w to derive the effective size for legacy forms."
+        },
+        "operand_size_prefix": {
+          "type": "string",
+          "enum": ["ignored", "toggles", "required", "forbidden"],
+          "description": "How the 66h prefix interacts with this encoding. 'toggles' = flips between the mode's default and the alternate size (the usual 16<->32 dance). 'required'/'forbidden' cover forms where 66h is architecturally fixed. 'ignored' for encodings unaffected (most vector forms)."
+        },
+        "address_size_prefix": {
+          "type": "string",
+          "enum": ["ignored", "toggles", "required", "forbidden"],
+          "description": "Same idea for the 67h address-size prefix."
+        },
+
+        "immediate_size_bits":    { "type": "integer" },
+        "displacement_size_bits": { "type": "integer" },
+
+        "rex_w": { "type": "boolean" },
+        "vex":   { "$ref": "#/$defs/vex" },
+        "evex":  { "$ref": "#/$defs/evex" },
+        "xop":   { "$ref": "#/$defs/xop" },
+
+        "encoding_string": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "description": "default_operand_size is required for legacy encodings and forbidden for the vector-prefix encodings, where width comes from the prefix instead.",
+          "if":   { "not": { "anyOf": [ { "required": ["vex"] }, { "required": ["evex"] }, { "required": ["xop"] } ] } },
+          "then": { "required": ["default_operand_size"] },
+          "else": { "not":      { "required": ["default_operand_size"] } }
+        },
+        {
+          "description": "vex, evex and xop are mutually exclusive on a single encoding.",
+          "not": {
+            "anyOf": [
+              { "allOf": [ { "required": ["vex"] },  { "required": ["evex"] } ] },
+              { "allOf": [ { "required": ["vex"] },  { "required": ["xop"] } ] },
+              { "allOf": [ { "required": ["evex"] }, { "required": ["xop"] } ] }
+            ]
+          }
+        }
+      ]
+    },
+
+    "modes": {
+      "type": "object",
+      "description": "All four booleans MUST be present per the modes_completeness convention.",
+      "required": ["real", "protected", "long_64", "compat_32"],
+      "properties": {
+        "real":      { "type": "boolean" },
+        "protected": { "type": "boolean" },
+        "long_64":   { "type": "boolean" },
+        "compat_32": { "type": "boolean" }
+      }
+    },
+
+    "flags": {
+      "type": "object",
+      "description": "Absent key = unchanged. Present key = one of the flag_effect values.",
+      "properties": {
+        "cf": { "$ref": "#/$defs/flag_effect" },
+        "pf": { "$ref": "#/$defs/flag_effect" },
+        "af": { "$ref": "#/$defs/flag_effect" },
+        "zf": { "$ref": "#/$defs/flag_effect" },
+        "sf": { "$ref": "#/$defs/flag_effect" },
+        "of": { "$ref": "#/$defs/flag_effect" },
+        "df": { "$ref": "#/$defs/flag_effect" },
+        "if": { "$ref": "#/$defs/flag_effect" },
+        "tf": { "$ref": "#/$defs/flag_effect" },
+        "ac": { "$ref": "#/$defs/flag_effect" },
+        "nt": { "$ref": "#/$defs/flag_effect" },
+        "rf": { "$ref": "#/$defs/flag_effect" }
+      }
+    },
+
+    "vendor_override": {
+      "type": "object",
+      "description": "How one vendor deviates from the instruction's baseline fields. A key present here REPLACES the corresponding baseline key wholesale for that vendor — values are never merged. 'note' is mandatory so every deviation states what differs and why.",
+      "required": ["note"],
+      "additionalProperties": false,
+      "properties": {
+        "note":           { "type": "string", "description": "Prose statement of the deviation." },
+        "modes":          { "$ref": "#/$defs/modes" },
+        "flags":          { "$ref": "#/$defs/flags" },
+        "cpuid_features": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "flag_effect": {
+      "type": "string",
+      "enum": ["modified", "set", "cleared", "undefined", "restored", "tested"],
+      "description": "There is intentionally no 'unchanged' value — omit the key instead. See conventions.flags_absence."
+    },
+
+    "vex": {
+      "type": "object",
+      "properties": {
+        "length": { "type": "string", "enum": ["128", "256", "LIG"] },
+        "pp":     { "type": "string", "enum": ["none", "66", "F2", "F3"] },
+        "mmmmm":  { "type": "string", "enum": ["0F", "0F38", "0F3A"] },
+        "w":      { "type": "string", "enum": ["0", "1", "IG"] }
+      }
+    },
+
+    "xop": {
+      "type": "object",
+      "description": "XOP prefix fields (AMD XOP, TBM and LWP). The 8Fh-escaped analogue of VEX; maps 8/9/A are disjoint from the VEX maps.",
+      "properties": {
+        "length": { "type": "string", "enum": ["128", "256", "LIG"] },
+        "pp":     { "type": "string", "enum": ["none", "66", "F2", "F3"] },
+        "map":    { "type": "string", "enum": ["XOP8", "XOP9", "XOPA"] },
+        "w":      { "type": "string", "enum": ["0", "1", "IG"] }
+      }
+    },
+
+    "evex": {
+      "type": "object",
+      "properties": {
+        "length":           { "type": "string", "enum": ["128", "256", "512", "LIG"] },
+        "pp":               { "type": "string", "enum": ["none", "66", "F2", "F3"] },
+        "map":              { "type": "string", "enum": ["0F", "0F38", "0F3A", "MAP4", "MAP5", "MAP6"] },
+        "w":                { "type": "string", "enum": ["0", "1", "IG"] },
+        "masking":          { "type": "string", "enum": ["none", "merge", "zero_or_merge"] },
+        "broadcast":        { "type": "boolean" },
+        "rounding_control": { "type": "boolean" },
+        "sae":              { "type": "boolean" },
+        "tuple_type":       { "type": "string" }
+      }
+    }
+  }
+}

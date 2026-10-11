@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>x86 Reference - TonicBox</title>
+  <meta name="description" content="A fast, searchable x86/x86-64 instruction reference: encodings, operands, flags, CPU modes, exceptions, and the byte layout of every form.">
+  <link rel="canonical" href="https://x86.tonicbox.dev/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="TonicBox">
+  <meta property="og:title" content="x86 Instruction Reference">
+  <meta property="og:description" content="A fast, searchable x86/x86-64 instruction reference: encodings, operands, flags, CPU modes, exceptions, and the byte layout of every form.">
+  <meta property="og:url" content="https://x86.tonicbox.dev/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:site" content="@Tonic_Box">
+  <link rel="stylesheet" href="x86.css?v=1">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230b0e14'/><text x='2' y='12' font-family='monospace' font-size='11' fill='%237aa2f7'>&gt;_</text></svg>">
+  <script>(function(){var s=document.createElement("script");var h=location.hostname;s.src=(h==="localhost"||h==="127.0.0.1"?"":"https://tonicbox.dev")+"/nav.js?v=24";s.defer=true;document.head.appendChild(s);})();</script>
+</head>
+<body>
+  <div id="boot">
+    <div class="boot-box">
+      <div class="boot-title"><span class="g">&gt;_</span> tonicbox@x86: ~</div>
+      <div class="boot-log" id="boot-log"></div>
+      <div class="boot-skip" id="boot-skip"></div>
+    </div>
+  </div>
+
+  <button class="drawer-toggle" id="drawerToggle" type="button" aria-label="browse">&#9776; browse</button>
+  <div class="rail-scrim" id="railScrim"></div>
+
+  <div id="app" hidden>
+    <aside class="rail-left" aria-label="browse and filter">
+      <div class="search-wrap">
+        <div class="search-row">
+          <span class="pfx">/</span>
+          <input id="q" type="text" placeholder="search instructions..." autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="search">
+        </div>
+        <div class="search-meta">
+          <label class="ft-toggle"><input type="checkbox" id="ftToggle"> full-text</label>
+          <span class="result-count" id="resultCount"></span>
+        </div>
+      </div>
+      <div class="facets" id="facets"></div>
+      <div class="active-filters" id="activeFilters"></div>
+      <div class="ilist" id="ilist"></div>
+    </aside>
+
+    <main class="center" id="center">
+      <div class="center-inner" id="view"></div>
+    </main>
+
+    <aside class="rail-right" id="toc" aria-label="on this page"></aside>
+  </div>
+
+  <div id="palette" aria-hidden="true">
+    <div class="pal-box">
+      <div class="pal-inp-row">
+        <span class="pfx">&gt;</span>
+        <input id="pal-q" type="text" placeholder="jump to an instruction..." autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="command palette">
+      </div>
+      <div class="pal-list" id="pal-list"></div>
+      <div class="pal-foot">
+        <span><kbd>&uarr;</kbd><kbd>&darr;</kbd> navigate</span>
+        <span><kbd>enter</kbd> open</span>
+        <span><kbd>esc</kbd> close</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=1" defer></script>
+</body>
+</html>
