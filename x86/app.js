@@ -357,12 +357,12 @@
   /* ---------------- byte diagram ---------------- */
   function byteBoxes(enc) {
     var b = [];
-    if (enc.mandatory_prefix && enc.mandatory_prefix !== "none")
+    if (!enc.vex && !enc.evex && !enc.xop && enc.mandatory_prefix && enc.mandatory_prefix !== "none")
       b.push({ c: "prefix", v: enc.mandatory_prefix, l: "pfx", t: "Mandatory prefix " + enc.mandatory_prefix + "h selects this opcode." });
     if (enc.vex)
       b.push({ c: "vprefix", v: "VEX", l: "VEX." + enc.vex.length, t: "VEX prefix. L=" + enc.vex.length + ", pp=" + enc.vex.pp + ", map=" + enc.vex.mmmmm + ", W=" + enc.vex.w });
     else if (enc.evex)
-      b.push({ c: "vprefix", v: "EVEX", l: "EVEX." + enc.evex.length, t: "EVEX prefix (4 bytes). L=" + enc.evex.length + ", pp=" + enc.evex.pp + ", map=" + enc.evex.map + ", W=" + enc.evex.w + (enc.evex.masking && enc.evex.masking !== "none" ? ", masking=" + enc.evex.masking : "") });
+      b.push({ c: "vprefix", v: "EVEX", l: "EVEX." + (enc.evex.length || enc.evex.map), t: "EVEX prefix (4 bytes). map=" + enc.evex.map + ", pp=" + enc.evex.pp + (enc.evex.length ? ", L=" + enc.evex.length : "") + ", W=" + enc.evex.w + (enc.evex.masking && enc.evex.masking !== "none" ? ", masking=" + enc.evex.masking : "") + (enc.evex.nd ? ", ND (new-data dest)" : "") + (enc.evex.nf ? ", NF (no flags)" : "") });
     else if (enc.xop)
       b.push({ c: "vprefix", v: "XOP", l: "XOP." + enc.xop.map, t: "XOP prefix (AMD). L=" + enc.xop.length + ", pp=" + enc.xop.pp + ", map=" + enc.xop.map + ", W=" + enc.xop.w });
     else if (enc.rex_w)
@@ -578,7 +578,7 @@
     // decode grid for primary encoding
     h += '<div class="kv">';
     h += kv("Opcode map", primary.prefix_map || "legacy");
-    if (primary.mandatory_prefix && primary.mandatory_prefix !== "none") h += kv("Mandatory prefix", primary.mandatory_prefix + "h");
+    if (!primary.vex && !primary.evex && !primary.xop && primary.mandatory_prefix && primary.mandatory_prefix !== "none") h += kv("Mandatory prefix", primary.mandatory_prefix + "h");
     h += kv("Opcode", '<span class="hl">' + esc(primary.opcode || "") + '</span>');
     if (primary.opcode_extension != null) h += kv("Opcode ext", "/" + primary.opcode_extension);
     h += kv("ModR/M", primary.modrm ? "yes" : "no");
@@ -590,7 +590,7 @@
     if (primary.immediate_size_bits) h += kv("Immediate", primary.immediate_size_bits + "-bit");
     if (primary.displacement_size_bits) h += kv("Displacement", primary.displacement_size_bits + "-bit");
     if (primary.vex) h += kv("VEX", "L=" + primary.vex.length + " pp=" + primary.vex.pp + " map=" + primary.vex.mmmmm + " W=" + primary.vex.w);
-    if (primary.evex) h += kv("EVEX", "L=" + primary.evex.length + " pp=" + primary.evex.pp + " map=" + primary.evex.map + " W=" + primary.evex.w + (primary.evex.masking && primary.evex.masking !== "none" ? " mask=" + primary.evex.masking : "") + (primary.evex.broadcast ? " bcast" : "") + (primary.evex.sae ? " sae" : "") + (primary.evex.rounding_control ? " rc" : ""));
+    if (primary.evex) h += kv("EVEX", (primary.evex.length ? "L=" + primary.evex.length + " " : "") + "pp=" + primary.evex.pp + " map=" + primary.evex.map + " W=" + primary.evex.w + (primary.evex.masking && primary.evex.masking !== "none" ? " mask=" + primary.evex.masking : "") + (primary.evex.broadcast ? " bcast" : "") + (primary.evex.sae ? " sae" : "") + (primary.evex.rounding_control ? " rc" : "") + (primary.evex.nd ? " ND" : "") + (primary.evex.nf ? " NF" : ""));
     if (primary.xop) h += kv("XOP", "L=" + primary.xop.length + " pp=" + primary.xop.pp + " map=" + primary.xop.map + " W=" + primary.xop.w);
     h += '</div>';
 
@@ -752,6 +752,13 @@
     });
     h += '</ul>';
 
+    if (DATA.coverage) {
+      h += '<h2 class="ov-h2">Coverage</h2><p class="prov">' + esc(DATA.coverage.note || "");
+      if (DATA.coverage.semantics_from) h += ' ' + esc(DATA.coverage.semantics_from);
+      if (DATA.coverage.encoding_only_isa && DATA.coverage.encoding_only_isa.length) h += ' Encoding-only (no prose yet): <b>' + DATA.coverage.encoding_only_isa.map(esc).join(", ") + '</b>.';
+      h += '</p>';
+    }
+
     h += '<p class="prov" style="margin-top:2rem">Data modeled to the TonicBox x86 ISA schema. Baseline fields follow Intel documentation; AMD divergences appear as per-instruction vendor overrides.</p>';
 
     var view = $("#view");
@@ -877,7 +884,7 @@
   /* ---------------- load ---------------- */
   function start() {
     runBoot();
-    fetch("x86.json?v=1")
+    fetch("x86.json?v=2")
       .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
       .then(function (json) {
         DATA = json;

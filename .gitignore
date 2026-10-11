@@ -5,3 +5,5 @@ tb32hv/
 Cairn/
 tbvm.wasm
 publish.sh
+tools/x86-dataset/cache/
+claudedocs/
