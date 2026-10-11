@@ -261,6 +261,8 @@ pre.code .cmt { color: var(--muted); }
 .ov-btn { font-size: 13px; padding: .5rem .9rem; border: 1px solid var(--border-2); border-radius: 6px;
   background: var(--panel); color: var(--dim); cursor: pointer; }
 .ov-btn:hover { border-color: var(--blue); color: var(--blue); text-decoration: none; }
+.ov-btn.ghost { background: transparent; }
+.insn-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-bottom: 1.4rem; }
 
 /* ===== COMMAND PALETTE ===== */
 #palette { position: fixed; inset: 0; z-index: 1200; display: none; background: rgba(5,8,15,.6); padding-top: 12vh; justify-content: center; }

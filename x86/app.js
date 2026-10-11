@@ -476,6 +476,11 @@
     if (branch && branch.kind && branch.kind !== "none") h += '<span class="chip branch">branch: ' + esc(branch.kind) + (branch.target ? " / " + esc(branch.target) : "") + '</span>';
     h += '</div>';
 
+    h += '<div class="insn-actions">';
+    h += '<a class="ov-btn ghost" href="#/" id="toOverview">&larr; overview</a>';
+    h += '<a class="ov-btn" href="#" id="insnSurprise">surprise me &rarr;</a>';
+    h += '</div>';
+
     // description (shared, representative)
     if (descU.any) {
       var d = firstWith(forms, "description");
@@ -532,6 +537,8 @@
     view.parentNode.scrollTop = 0;
 
     wireDescToggle();
+    var surp = $("#insnSurprise");
+    if (surp) surp.addEventListener("click", function (e) { e.preventDefault(); navigate(MNEMS[Math.floor(Math.random() * MNEMS.length)]); });
     var strip = $("#formStrip");
     strip.addEventListener("click", function (e) {
       var btn = e.target.closest(".form-tab");
