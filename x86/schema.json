@@ -32,6 +32,9 @@
         "flags_absence",
         "vendor_semantics",
         "operand_size_forms",
+        "modes_semantics",
+        "vector_prefix_selector",
+        "implicit_operand_naming",
         "id_uniqueness"
       ],
       "properties": {
@@ -65,6 +68,21 @@
           "const": "one_form_per_effective_size",
           "description": "16/32/64-bit variants of the same mnemonic MUST be separate instruction entries, distinguished by encoding.default_operand_size plus the operand_size_prefix / rex_w fields on their encodings. Do not collapse them into a single entry with a variable size."
         },
+        "modes_semantics": {
+          "type": "string",
+          "const": "execute_legal_architectural",
+          "description": "modes.<m> = the form is architecturally VALID TO EXECUTE in CPU mode m on a processor that implements it, counting only mode-inherent constraints (operating mode, 64-bit-only encodings, and modes a feature's defining environment requires). Runtime enable state (CR0/CR4/XCR0, CPL, OS support) is a SEPARATE prerequisite and is NOT reflected here. long_64 and compat_32 are taken from the SDM/felix opcode-table columns (64-Bit Mode / Compat-Leg Mode); protected tracks compat_32; real is derived by rule (real = compat_32 unless the feature's defining environment excludes real mode, e.g. VMX/SMX/SGX/SVM/TDX/SNP, or the encoding is 64-bit-only). Consequence: VEX/EVEX vector forms keep real=true (the prefix decodes in real mode and feature-enable is a runtime concern), while VMXON/ENCLS/etc. get real=false."
+        },
+        "vector_prefix_selector": {
+          "type": "string",
+          "const": "pp_is_the_selector",
+          "description": "On VEX/EVEX/XOP encodings the 66/F2/F3 operation selector lives in the prefix's pp field (vex.pp / evex.pp / xop.pp), NOT as a separately emitted legacy prefix byte. encodings.mandatory_prefix is therefore FORBIDDEN on any encoding carrying vex/evex/xop, and byte-level consumers MUST NOT draw a physical 66/F2/F3 byte for these forms."
+        },
+        "implicit_operand_naming": {
+          "type": "string",
+          "const": "width_neutral_r_prefix",
+          "description": "implicit_operands.name uses fixed register names for size-fixed operands (AL, AX, EAX, RAX, AH, ...) and WIDTH-NEUTRAL names with a lowercase 'r' prefix (rAX, rBX, rCX, rDX, rSI, rDI, rSP, rBP) for operands whose width follows the effective operand size (or the address size, for string/counter operations such as LOOP/REP/LODS/STOS/SCAS). A width-neutral name MUST NOT be listed alongside a fixed-width alias it contains."
+        },
         "id_uniqueness": {
           "type": "string",
           "const": "globally_unique",
@@ -86,6 +104,17 @@
           "description": { "type": "string" },
           "parent":      { "type": "string" }
         }
+      }
+    },
+
+    "coverage": {
+      "type": "object",
+      "description": "Declares what this dataset does and does not cover, so absence can be read as scope rather than defect.",
+      "properties": {
+        "note":              { "type": "string" },
+        "semantics_from":    { "type": "string", "description": "Where description/pseudocode come from, and which records lack them." },
+        "encoding_only_isa": { "type": "array", "items": { "type": "string" }, "description": "ISA extensions ingested as encoding-only (no description/pseudocode), e.g. APX, AVX10." },
+        "not_covered":       { "type": "array", "items": { "type": "string" } }
       }
     },
 
@@ -239,8 +268,8 @@
       "properties": {
         "prefix_map": {
           "type": "string",
-          "enum": ["legacy", "0F", "0F38", "0F3A", "MAP4", "MAP5", "MAP6", "XOP8", "XOP9", "XOPA"],
-          "description": "Escape/opcode map. Required. Use 'legacy' for single-byte opcodes with no escape. See conventions.opcode_normalization."
+          "enum": ["legacy", "0F", "0F38", "0F3A", "MAP4", "MAP5", "MAP6", "MAP7", "XOP8", "XOP9", "XOPA"],
+          "description": "Escape/opcode map. Required. Use 'legacy' for single-byte opcodes with no escape. MAP4-MAP7 are EVEX opcode maps introduced by APX/AVX10 (MAP7 carries the APX MSR-access instructions). See conventions.opcode_normalization."
         },
         "mandatory_prefix": {
           "type": "string",
@@ -300,13 +329,18 @@
               { "allOf": [ { "required": ["evex"] }, { "required": ["xop"] } ] }
             ]
           }
+        },
+        {
+          "description": "mandatory_prefix is forbidden on vector-prefix encodings; the 66/F2/F3 selector is carried by pp. See conventions.vector_prefix_selector.",
+          "if":   { "anyOf": [ { "required": ["vex"] }, { "required": ["evex"] }, { "required": ["xop"] } ] },
+          "then": { "not": { "required": ["mandatory_prefix"] } }
         }
       ]
     },
 
     "modes": {
       "type": "object",
-      "description": "All four booleans MUST be present per the modes_completeness convention.",
+      "description": "CPU modes this form is architecturally valid to execute in. All four booleans MUST be present (modes_completeness). Meaning and derivation are fixed by conventions.modes_semantics (execute-legal, architectural): long_64 and compat_32 come from the SDM opcode-table columns, protected tracks compat_32, and real is rule-derived.",
       "required": ["real", "protected", "long_64", "compat_32"],
       "properties": {
         "real":      { "type": "boolean" },
@@ -380,13 +414,15 @@
       "properties": {
         "length":           { "type": "string", "enum": ["128", "256", "512", "LIG"] },
         "pp":               { "type": "string", "enum": ["none", "66", "F2", "F3"] },
-        "map":              { "type": "string", "enum": ["0F", "0F38", "0F3A", "MAP4", "MAP5", "MAP6"] },
+        "map":              { "type": "string", "enum": ["0F", "0F38", "0F3A", "MAP4", "MAP5", "MAP6", "MAP7"] },
         "w":                { "type": "string", "enum": ["0", "1", "IG"] },
         "masking":          { "type": "string", "enum": ["none", "merge", "zero_or_merge"] },
         "broadcast":        { "type": "boolean" },
         "rounding_control": { "type": "boolean" },
         "sae":              { "type": "boolean" },
-        "tuple_type":       { "type": "string" }
+        "tuple_type":       { "type": "string" },
+        "nd":               { "type": "boolean", "description": "APX EVEX ND (new-data-destination) bit: the destination is encoded in EVEX.vvvv, giving a non-destructive 3-operand form." },
+        "nf":               { "type": "boolean", "description": "APX EVEX NF (no-flags) bit: the instruction suppresses its EFLAGS update." }
       }
     }
   }
