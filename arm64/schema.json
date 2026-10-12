@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ARM instruction dataset (A64 / A32 / T32)",
+  "description": "Structural ARM instruction reference built from the Arm Machine-Readable Specification open JSON. Encodings, operands and feature gates only; narrative semantics (ASL pseudocode), flag effects and prose are not in the permissive source and are linked out per-instruction via doc_url.",
+  "type": "object",
+  "required": ["version", "sources", "isets", "groups", "instructions"],
+  "properties": {
+    "version": { "type": "string" },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind"],
+        "properties": {
+          "id": { "type": "string" }, "kind": { "type": "string" }, "name": { "type": "string" },
+          "url": { "type": "string" }, "version": { "type": "string" }, "license": { "type": "string" }, "fetched": { "type": "string" }
+        }
+      }
+    },
+    "conventions": { "type": "object" },
+    "isets": { "type": "array", "items": { "type": "string", "enum": ["A64", "A32", "T32"] } },
+    "coverage": { "type": "object" },
+    "groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "name"],
+        "properties": {
+          "id": { "type": "string" },
+          "kind": { "type": "string", "enum": ["class", "feature"] },
+          "name": { "type": "string" }
+        }
+      }
+    },
+    "instructions": { "type": "array", "items": { "$ref": "#/$defs/instruction" } }
+  },
+  "$defs": {
+    "instruction": {
+      "type": "object",
+      "required": ["id", "iset", "mnemonic", "encoding"],
+      "properties": {
+        "id": { "type": "string", "description": "Globally unique; the Arm MRS page slug." },
+        "iset": { "type": "string", "enum": ["A64", "A32", "T32"] },
+        "mnemonic": { "type": "string" },
+        "summary": { "type": "string", "description": "The assembly signature (no prose available)." },
+        "signature": { "type": "string", "description": "Assembly template, e.g. 'ADD <Xd>, <Xn>, <Xm>'." },
+        "groups": { "type": "array", "items": { "type": "string" }, "description": "References to groups[].id (one class + any feature groups)." },
+        "operands": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["text"],
+            "properties": {
+              "text": { "type": "string", "description": "Assembly placeholder, e.g. '<Xd>'." },
+              "kind": { "type": "string", "enum": ["reg", "simd", "sve", "pred", "imm", "mem", "label", "cond"] },
+              "fields": { "type": "array", "items": { "type": "string" }, "description": "Encoding field name(s) this operand is encoded in." }
+            }
+          }
+        },
+        "encoding": {
+          "type": "object",
+          "required": ["width", "fields"],
+          "properties": {
+            "width": { "type": "integer", "enum": [16, 32], "description": "Instruction word width in bits." },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["lo", "hi"],
+                "properties": {
+                  "name": { "type": ["string", "null"], "description": "Named field, or null for a fixed opcode bit group." },
+                  "lo": { "type": "integer" }, "hi": { "type": "integer", "description": "Inclusive bit indices (bit 0 = LSB)." },
+                  "value": { "type": ["string", "null"], "description": "Fixed bit pattern (e.g. \"'000'\") or variable mask (e.g. \"'xxxx'\")." },
+                  "fixed": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "features": { "type": "array", "items": { "type": "string" }, "description": "Arm FEAT_* gates (from the encoding condition)." },
+        "doc_url": { "type": "string", "description": "Deep link to the Arm A-profile ISA manual (A64 -> DDI0602, A32/T32 -> DDI0597)." },
+        "provenance": { "type": "array", "items": { "type": "object" } }
+      }
+    }
+  }
+}
