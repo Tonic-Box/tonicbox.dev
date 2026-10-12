@@ -88,6 +88,7 @@
     var blogUrl = isLocal ? "/blog/" : "https://blog.tonicbox.dev";
     var emulatorUrl = isLocal ? "/emulator/" : "https://emulator.tonicbox.dev";
     var x86Url = isLocal ? "/x86/" : "https://x86.tonicbox.dev";
+    var arm64Url = isLocal ? "/arm64/" : "https://arm64.tonicbox.dev";
 
     var nav = el("nav", "tbnav", { "aria-label": "site" });
 
@@ -107,11 +108,13 @@
     var blogItem = link(blogUrl, "Blog");
     var emulatorItem = link(emulatorUrl, "Emulator");
     var x86Item = link(x86Url, "x86");
+    var arm64Item = link(arm64Url, "arm64");
     items.appendChild(homeItem);
     items.appendChild(blogItem);
     items.appendChild(portfolioItem);
     items.appendChild(emulatorItem);
     items.appendChild(x86Item);
+    items.appendChild(arm64Item);
 
     var drop = el("div", "tbnav-drop");
     var ctf = link(apex + "/ctf.html", "CTF Challenge", "tbnav-ctf");
@@ -169,18 +172,21 @@
     var subBlog = host.indexOf("blog.") === 0;
     var subEmulator = host.indexOf("emulator.") === 0;
     var subX86 = host.indexOf("x86.") === 0;
+    var subArm64 = host.indexOf("arm64.") === 0;
     var onPortfolio = subPortfolio || path.indexOf("/portfolio") === 0;
     var onBlog = subBlog || path.indexOf("/blog") === 0;
     var onEmulator = subEmulator || path.indexOf("/emulator") === 0;
     var onX86 = subX86 || path.indexOf("/x86") === 0;
+    var onArm64 = subArm64 || path.indexOf("/arm64") === 0;
     var onCtf = /\/(ctf|tbc|sh|vi|tbdbg|as|arch|syscalls|tbc-std-docs|changelog)\.html$/.test(location.pathname);
     var onHall = /\/hall\.html$/.test(location.pathname);
-    var onHome = !subPortfolio && !subBlog && !subEmulator && !subX86 && !onPortfolio && !onBlog && !onEmulator && !onX86 && !onCtf && !onHall && (path === "/" || path === "");
+    var onHome = !subPortfolio && !subBlog && !subEmulator && !subX86 && !subArm64 && !onPortfolio && !onBlog && !onEmulator && !onX86 && !onArm64 && !onCtf && !onHall && (path === "/" || path === "");
     if (onHome) { brand.classList.add("active"); homeItem.classList.add("active"); }
     if (onPortfolio) portfolioItem.classList.add("active");
     if (onBlog) blogItem.classList.add("active");
     if (onEmulator) emulatorItem.classList.add("active");
     if (onX86) x86Item.classList.add("active");
+    if (onArm64) arm64Item.classList.add("active");
     if (onCtf) ctf.classList.add("active");
     if (onHall) hallItem.classList.add("active");
   }
