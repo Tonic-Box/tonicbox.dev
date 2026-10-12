@@ -114,7 +114,8 @@
     MNEMS.forEach(function (m) {
       var forms = BY_MNEM[m];
       var summ = forms[0].signature || forms[0].summary || "";
-      SROW[m] = { mlow: m.toLowerCase(), slow: summ.toLowerCase(), summary: summ, count: forms.length, ftext: null };
+      var desc = forms[0].description || "";
+      SROW[m] = { mlow: m.toLowerCase(), slow: (desc + " " + summ).toLowerCase(), summary: summ, desc: desc, count: forms.length, ftext: null };
     });
     DIMS.forEach(function (d) { FCOUNT[d] = {}; FILTERS[d] = new Set(); });
     MNEMS.forEach(function (m) {
@@ -131,6 +132,7 @@
     if (row.ftext != null) return row.ftext;
     var parts = [];
     BY_MNEM[m].forEach(function (f) {
+      if (f.description) parts.push(f.description);
       if (f.signature) parts.push(f.signature);
       (f.operands || []).forEach(function (o) { parts.push(o.text); });
       (f.features || []).forEach(function (x) { parts.push(x); });
@@ -231,9 +233,12 @@
       }
       var row = el("div", "irow");
       row.dataset.mnem = m;
-      row.title = SROW[m].summary || "";
-      row.appendChild(el("span", "m", m));
-      if (SROW[m].count > 1) row.appendChild(el("span", "cnt", SROW[m].count + " forms"));
+      row.title = SROW[m].desc || SROW[m].summary || "";
+      var top = el("div", "irow-top");
+      top.appendChild(el("span", "m", m));
+      if (SROW[m].count > 1) top.appendChild(el("span", "cnt", SROW[m].count + " forms"));
+      row.appendChild(top);
+      if (SROW[m].desc) row.appendChild(el("div", "irow-sub", SROW[m].desc));
       row.addEventListener("click", function () { navigate(m); closeDrawer(); });
       frag.appendChild(row);
     });
@@ -301,7 +306,7 @@
     var h = "";
     h += '<div class="eyebrow">ARM instruction</div>';
     h += '<h1 class="insn"><span class="accent">' + esc(mnem) + '</span></h1>';
-    h += '<div class="insn-summary">' + esc(SROW[mnem].summary) + '</div>';
+    h += '<div class="insn-summary">' + esc(SROW[mnem].desc || SROW[mnem].summary) + '</div>';
 
     h += '<div class="chips">';
     Object.keys(isets).forEach(function (s) { h += isetTag(s); });
@@ -485,7 +490,11 @@
       if (DATA.coverage.semantics_from) h += ' ' + esc(DATA.coverage.semantics_from);
       h += '</p>';
     }
-    h += '<p class="prov" style="margin-top:1.4rem">Built from the Arm Machine-Readable Specification open release. Structural data only; pseudocode, flag effects and prose are published by Arm and linked per instruction.</p>';
+    var src0 = (DATA.sources || [])[0] || {};
+    h += '<h2 class="ov-h2">Attribution &amp; license</h2><p class="prov">';
+    h += (DATA.coverage && DATA.coverage.attribution ? esc(DATA.coverage.attribution) + " " : "");
+    h += "Encoding data is from the " + esc(src0.name || "Arm MRS") + " (" + esc(src0.license || "") + "); " + esc(src0.copyright || "") + " Short descriptions are TonicBox’s own factual mnemonic expansions, not sourced from Arm; ASL pseudocode and prose are Arm’s and are linked, not reproduced.";
+    h += '</p>';
 
     var view = $("#view");
     view.innerHTML = h;
@@ -537,7 +546,7 @@
     out.forEach(function (m, idx) {
       var it = el("div", "pal-item" + (idx === 0 ? " sel" : ""));
       it.dataset.mnem = m;
-      it.innerHTML = '<span class="m">' + esc(m) + '</span><span class="s">' + esc(SROW[m].summary || "") + '</span>';
+      it.innerHTML = '<span class="m">' + esc(m) + '</span><span class="s">' + esc(SROW[m].desc || SROW[m].summary || "") + '</span>';
       it.addEventListener("click", function () { closePalette(); navigate(m); });
       list.appendChild(it);
     });
@@ -586,7 +595,7 @@
   /* ---------------- load ---------------- */
   function start() {
     runBoot();
-    fetch("arm64.json?v=1")
+    fetch("arm64.json?v=2")
       .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
       .then(function (json) { DATA = json; buildIndex(); dataReady = true; bootFinish(); })
       .catch(function (err) {

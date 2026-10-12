@@ -94,13 +94,14 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .ilist { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 .ilist-group-h { position: sticky; top: 0; z-index: 1; background: var(--panel-3); color: var(--muted);
   font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; padding: .3rem .8rem; border-bottom: 1px solid var(--border); }
-.irow { display: flex; align-items: baseline; gap: .5rem; padding: .32rem .8rem; cursor: pointer; border-left: 2px solid transparent; }
+.irow { display: block; padding: .34rem .8rem; cursor: pointer; border-left: 2px solid transparent; }
 .irow:hover { background: var(--panel-3); }
 .irow.active { background: rgba(122,162,247,.1); border-left-color: var(--blue); }
+.irow-top { display: flex; align-items: baseline; gap: .5rem; }
 .irow .m { color: var(--text); font-size: 13px; }
 .irow.active .m { color: var(--blue); }
-.irow .s { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .irow .cnt { margin-left: auto; color: var(--muted); font-size: 10px; flex: none; }
+.irow-sub { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: .05rem; }
 .ilist-empty { padding: 1.2rem .8rem; color: var(--muted); font-size: 12.5px; text-align: center; }
 
 /* ===== CENTER ===== */
