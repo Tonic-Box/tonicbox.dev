@@ -311,6 +311,29 @@ function passMergeAPX() {
   report.passes.mergeAPX = { formsAppended: appended, idCollisionsResolved: renamed, groupsAdded: addedGroups, totalFormsNow: db.instructions.length };
 }
 
+/* ---------------- Pass F2: reuse base-instruction semantics for APX re-encodings ---------------- */
+function passReuseAPXSemantics() {
+  const src = {};
+  db.instructions.forEach(function (i) {
+    const apx = (i.groups || []).some(function (g) { return /^isa-apx|^isa-avx10/.test(g); });
+    if (apx || !i.pseudocode) return;
+    if (!src[i.mnemonic]) src[i.mnemonic] = { pseudocode: i.pseudocode, description: i.description };
+  });
+  let reused = 0;
+  db.instructions.forEach(function (i) {
+    const isApx = (i.groups || []).some(function (g) { return /^isa-apx/.test(g); });
+    if (!isApx || i.pseudocode) return;
+    const s = src[i.mnemonic];
+    if (!s) return;
+    i.pseudocode = s.pseudocode;
+    if (!i.description && s.description) i.description = s.description;
+    i.notes = "Encoding ingested from Intel XED. Operation reused from the base " + i.mnemonic +
+      " instruction (APX re-encoding): NDD forms write the result to the EVEX.vvvv register, NF forms suppress the EFLAGS update. Flags and exceptions still pending an SDM source.";
+    reused++;
+  });
+  report.passes.reuseAPX = { formsGivenReusedSemantics: reused };
+}
+
 /* ---------------- Pass G: dataset metadata ---------------- */
 function passMetadata() {
   db.version = "2026.2";
@@ -320,7 +343,7 @@ function passMetadata() {
   const missing = db.instructions.filter(function (i) { return !i.description && !i.pseudocode; }).length;
   db.coverage = {
     note: "x86 / x86-64 only. AArch64/ARM is a separate ISA and is not covered.",
-    semantics_from: "Description and pseudocode are from the Intel SDM via felixcloutier. " + missing + " forms (APX and AVX10, ingested from Intel XED) carry encodings/operands/modes/groups but no description/pseudocode, pending an authoritative SDM source.",
+    semantics_from: "Description and pseudocode are from the Intel SDM via felixcloutier. APX re-encodings of existing mnemonics reuse their base instruction's operation. " + missing + " forms (new APX mnemonics, AVX10, and AMD XOP/FMA4/3DNow/TBM/SSE4a/SVM) carry encodings/operands/modes/groups but no description/pseudocode, pending Intel APX/AVX10 specs or the AMD APM.",
     encoding_only_isa: ["APX", "AVX10"],
     not_covered: ["AArch64/ARM (separate ISA, separate dataset)", "Narrative semantics for APX/AVX10 forms"]
   };
@@ -341,6 +364,7 @@ passStripPrefix();
 passModes();
 passBackfill();
 passMergeAPX();
+passReuseAPXSemantics();
 const outDb = passMetadata();
 
 fs.writeFileSync(DATA, serialize(outDb));

@@ -7,3 +7,6 @@ tbvm.wasm
 publish.sh
 tools/x86-dataset/cache/
 claudedocs/
+x86/changelog.md
+x86/x86_json_audit.md
+x86/x86_missing_pseudocode_sources.md
