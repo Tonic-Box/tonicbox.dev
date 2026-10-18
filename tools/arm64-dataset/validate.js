@@ -1,6 +1,6 @@
 /**
  * Validates arm64/arm64.json and writes claudedocs/arm64-report.md.
- * Also validates a sample of Arm-manual doc_url links (HEAD) unless --no-net.
+ * Also checks every doc_url slug against the Arm page-slug map (deterministic).
  */
 const fs = require("fs");
 const path = require("path");
@@ -9,6 +9,7 @@ const { loadJSON } = require("./util.js");
 const DATA = path.join(__dirname, "..", "..", "arm64", "arm64.json");
 const REPORT = path.join(__dirname, "..", "..", "claudedocs", "arm64-report.md");
 const db = loadJSON(DATA);
+const PAGE_SLUG = loadJSON(path.join(__dirname, "page-slug-map.json"));
 const errors = [], warnings = [];
 const ins = db.instructions;
 
@@ -41,26 +42,30 @@ if (noDoc) warnings.push("instructions without doc_url: " + noDoc);
 
 const byIset = {}; ins.forEach(function (i) { byIset[i.iset] = (byIset[i.iset] || 0) + 1; });
 
-/* sample doc_url validation (HEAD) */
+/* deterministic doc_url slug validation against the Arm ISA-XML page map */
 let docSample = null;
-async function checkDocs() {
-  if (process.argv.includes("--no-net")) return;
-  const pick = [];
-  ["A64", "A32", "T32"].forEach(function (is) {
-    const forms = ins.filter(function (i) { return i.iset === is; });
-    for (let k = 0; k < 8 && forms.length; k++) pick.push(forms[Math.floor(k / 8 * forms.length)]);
+function checkDocs() {
+  const MARK = "Base-Instructions";
+  let mismatch = 0, badShape = 0, notInMap = 0, indexFallback = 0;
+  const badIds = [];
+  ins.forEach(function (i) {
+    const prov = (i.provenance || [])[0] || {};
+    const key = i.iset + ":" + prov.page;
+    const url = i.doc_url || "";
+    const at = url.indexOf(MARK + "/");
+    const slug = at >= 0 ? url.slice(at + MARK.length + 1) : "";
+    if (slug === "") indexFallback++;
+    const expect = PAGE_SLUG[key];
+    if (expect === undefined) { notInMap++; if (badIds.length < 8) badIds.push(i.id + " (unmapped)"); }
+    else if (slug !== expect) { mismatch++; if (badIds.length < 8) badIds.push(i.id + " (" + slug + "!=" + expect + ")"); }
+    // title slugs are all dashes; a surviving underscore means an id/encoding name leaked in
+    if (slug.indexOf("_") >= 0) { badShape++; if (badIds.length < 8) badIds.push(i.id + " (shape:" + slug + ")"); }
   });
-  let ok = 0, bad = [];
-  for (const i of pick) {
-    try {
-      const res = await fetch(i.doc_url, { method: "GET", redirect: "follow", headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) tonicbox-arm64/1.0", "Accept": "text/html" } });
-      if (res.ok) ok++; else bad.push(i.id + " (" + res.status + ")");
-    } catch (e) { bad.push(i.id + " (err)"); }
-    await new Promise(function (r) { setTimeout(r, 120); });
-  }
-  docSample = { checked: pick.length, ok: ok, bad: bad };
+  if (mismatch) errors.push("doc_url slug != page map: " + mismatch);
+  if (notInMap) errors.push("doc_url page not in slug map: " + notInMap);
+  if (badShape) errors.push("doc_url slug carries an underscore (encoding name leaked): " + badShape);
+  docSample = { total: ins.length, mismatch: mismatch, notInMap: notInMap, badShape: badShape, indexFallback: indexFallback, bad: badIds };
 }
-
 function write() {
   fs.mkdirSync(path.dirname(REPORT), { recursive: true });
   const L = [];
@@ -86,9 +91,9 @@ function write() {
   L.push("Structural only (encodings, operands, feature gates). Pseudocode / flag effects / prose are not in the permissive Arm MRS release; each instruction deep-links to the Arm manual (`doc_url`) for full semantics.");
   if (docSample) {
     L.push("");
-    L.push("## doc_url sample check");
+    L.push("## doc_url slug check");
     L.push("");
-    L.push(docSample.checked + " links checked, " + docSample.ok + " OK" + (docSample.bad.length ? ", bad: " + docSample.bad.join(", ") : "."));
+    L.push(docSample.total + " title slugs checked against the Arm ISA-XML page map (A64 DDI0602 2025-12, A32/T32 DDI0597 2022-12). mismatch: " + docSample.mismatch + ", unmapped: " + docSample.notInMap + ", underscore-leak: " + docSample.badShape + ", index-fallback (newer than snapshot): " + docSample.indexFallback + (docSample.bad.length ? " — " + docSample.bad.join(", ") : "."));
   }
   L.push("");
   L.push("## Sources");
@@ -97,8 +102,9 @@ function write() {
   console.log(errors.length ? "VALIDATION FAILED (" + errors.length + ")" : "VALIDATION PASSED");
   errors.forEach(function (e) { console.log("  ERR " + e); });
   warnings.forEach(function (w) { console.log("  WARN " + w); });
-  if (docSample) console.log("doc_url sample: " + docSample.ok + "/" + docSample.checked + " OK" + (docSample.bad.length ? " bad=" + docSample.bad.join(",") : ""));
+  if (docSample) console.log("doc_url slugs: " + docSample.total + " checked, mismatch=" + docSample.mismatch + " unmapped=" + docSample.notInMap + " underscore-leak=" + docSample.badShape + " index-fallback=" + docSample.indexFallback);
   console.log("report -> " + path.relative(path.join(__dirname, "..", ".."), REPORT));
   process.exit(errors.length ? 1 : 0);
 }
-checkDocs().then(write);
+checkDocs();
+write();

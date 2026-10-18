@@ -6,6 +6,7 @@ const fs = require("fs");
 const path = require("path");
 const { serialize, loadJSON } = require("./util.js");
 const { describe } = require("./describe.js");
+const PAGE_SLUG = loadJSON(path.join(__dirname, "page-slug-map.json"));
 
 const forms = loadJSON(path.join(__dirname, "cache", "arm64-forms.json"));
 const OUT = path.join(__dirname, "..", "..", "arm64", "arm64.json");
@@ -20,9 +21,16 @@ const CLASS_NAMES = {
 };
 function classId(f) { return "cls-" + f.iset.toLowerCase() + "-" + (f.group || "misc"); }
 function className(f) { return CLASS_NAMES[f.iset + ":" + f.group] || (f.group || "misc"); }
+const DOC_SNAP = {
+  A64: { man: "ddi0602", ver: "2025-12" },
+  A32: { man: "ddi0597", ver: "2022-12" },
+  T32: { man: "ddi0597", ver: "2022-12" }
+};
 function docUrl(f) {
-  const man = f.iset === "A64" ? "ddi0602" : "ddi0597";
-  return "https://developer.arm.com/documentation/" + man + "/latest/Base-Instructions/" + f.page;
+  const snap = DOC_SNAP[f.iset];
+  const base = "https://developer.arm.com/documentation/" + snap.man + "/" + snap.ver + "/Base-Instructions";
+  const slug = PAGE_SLUG[f.iset + ":" + f.page];
+  return slug ? base + "/" + slug : base;
 }
 
 const groups = {};
@@ -67,7 +75,7 @@ const db = {
   conventions: {
     structural_only: "encoding-and-operand data only; narrative semantics (ASL pseudocode), flag effects, and prose descriptions are not in the permissive source and are linked out to the Arm manual via doc_url.",
     bit_numbering: "encoding.fields use lo/hi inclusive bit indices; bit 0 is the least-significant bit of the instruction word.",
-    doc_url: "per-instruction deep link to the Arm A-profile ISA manual (A64 -> DDI0602, A32/T32 -> DDI0597).",
+    doc_url: "per-instruction deep link to the Arm A-profile ISA manual (A64 -> DDI0602 2025-12, A32/T32 -> DDI0597 2022-12). The URL slug is the page title (heading + brief), so each link is pinned to the exact ISA version the encoding data was generated from; Arm serves those versions permanently. Instructions newer than that snapshot link to the version's Base-Instructions index.",
     descriptions: "instruction.description is TonicBox's own concise text (factual mnemonic expansions), not sourced from Arm; it is not part of the BSD-3 dataset credited in sources[]."
   },
   isets: ["A64", "A32", "T32"],

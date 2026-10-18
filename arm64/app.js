@@ -595,7 +595,7 @@
   /* ---------------- load ---------------- */
   function start() {
     runBoot();
-    fetch("arm64.json?v=2")
+    fetch("arm64.json?v=3")
       .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
       .then(function (json) { DATA = json; buildIndex(); dataReady = true; bootFinish(); })
       .catch(function (err) {

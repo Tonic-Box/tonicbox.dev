@@ -9,6 +9,7 @@ function run(script, extraNodeArgs) {
 try {
   run("fetch-sources.js");
   run("parse-mrs.js", ["--max-old-space-size=4096"]);
+  run("build-page-map.js");
   run("build.js");
   run("validate.js");
   console.log("\npipeline complete.");
